@@ -1,4 +1,4 @@
-app = "stremio-multimodal-subtitles"
+app = "rosettasubs"
 primary_region = "iad"
 
 [build]

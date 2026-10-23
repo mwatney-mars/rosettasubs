@@ -1,6 +1,6 @@
-# Stremio Multimodal Subtitles Add-on
+# RosettaSubs — Stremio Multimodal Subtitles Add-on
 
-[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/mwatney-mars/stremio-subtitles)
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/mwatney-mars/rosettasubs)
 
 A TypeScript + Express Stremio Subtitles Add-on combining **multi-provider aggregation** (**Wyzie Subs**, **OpenSubtitles REST API v1**, **SubDL**) with **Multimodal AI fallback translation & audio/video transcription** (**Google Gemini** & **OpenAI-compatible** APIs).
 

@@ -1,7 +1,7 @@
 {
-  "name": "stremio-multimodal-subtitles",
+  "name": "rosettasubs",
   "version": "1.0.0",
-  "description": "Multi-provider (Wyzie, OpenSubtitles, SubDL) + Multimodal AI (Gemini/OpenAI) Subtitles Add-on for Stremio",
+  "description": "RosettaSubs — Multi-provider (Wyzie, OpenSubtitles, SubDL) + Multimodal AI (Gemini/OpenAI) Subtitles Add-on for Stremio",
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",

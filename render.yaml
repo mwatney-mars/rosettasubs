@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: stremio-multimodal-subtitles
+    name: rosettasubs
     runtime: docker
     plan: free
     healthCheckPath: /health

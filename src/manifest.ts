@@ -26,9 +26,9 @@ export function buildManifest(config: AddonConfig): StremioManifest {
       : `AI ${config.aiProvider.toUpperCase()} (${config.aiMode})`;
 
   return {
-    id: 'org.stremio.multimodal.subtitles',
+    id: 'org.stremio.rosettasubs',
     version: '1.0.0',
-    name: 'Multimodal Subtitles',
+    name: 'RosettaSubs',
     description: `Multi-provider subtitles (${providerList}) + Multimodal AI translation & transcription [${aiLabel}]. Active languages: ${langNames}.`,
     resources: ['subtitles'],
     types: ['movie', 'series'],

@@ -192,7 +192,7 @@ describe('Express Stremio Add-on Routes & Multimodal AI Flow', () => {
   it('serves /manifest.json and /:config/manifest.json', async () => {
     const res1 = await request(app).get('/manifest.json');
     expect(res1.status).toBe(200);
-    expect(res1.body.id).toBe('org.stremio.multimodal.subtitles');
+    expect(res1.body.id).toBe('org.stremio.rosettasubs');
     expect(res1.body.resources).toContain('subtitles');
 
     const cfg = encodeConfig({ languages: ['jpn'], providers: ['wyzie'] });
@@ -205,7 +205,7 @@ describe('Express Stremio Add-on Routes & Multimodal AI Flow', () => {
     const res = await request(app).get('/configure');
     expect(res.status).toBe(200);
     expect(res.headers['content-type']).toContain('text/html');
-    expect(res.text).toContain('Multimodal Subtitles');
+    expect(res.text).toContain('RosettaSubs');
   });
 
   it('aggregates provider subtitles and adds AI fallback track for missing target language', async () => {

@@ -1,7 +1,7 @@
 services:
-  stremio-subtitles:
+  rosettasubs:
     build: .
-    container_name: stremio-multimodal-subtitles
+    container_name: rosettasubs
     ports:
       - "${PORT:-7000}:7000"
     env_file:

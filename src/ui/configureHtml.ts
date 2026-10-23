@@ -10,7 +10,7 @@ export function renderConfigurePage(config: AddonConfig, baseUrl: string): strin
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Multimodal Subtitles — Stremio Add-on Configuration</title>
+  <title>RosettaSubs — Stremio Add-on Configuration</title>
   <style>
     :root {
       --bg: #0b0d14;
@@ -175,7 +175,7 @@ export function renderConfigurePage(config: AddonConfig, baseUrl: string): strin
 <body>
   <div class="container">
     <header>
-      <h1>Multimodal Subtitles</h1>
+      <h1>RosettaSubs</h1>
       <p>Multi-Provider Aggregation (Wyzie, OpenSubtitles, SubDL) + Multimodal AI Translation &amp; Transcription</p>
     </header>
 
