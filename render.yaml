@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: stremio-multimodal-subtitles
+    runtime: docker
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 7000
+      - key: DEFAULT_LANGUAGES
+        value: eng,spa,fre
+      - key: OPENSUBTITLES_API_KEY
+        sync: false
+      - key: SUBDL_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
