@@ -43,7 +43,17 @@ export async function searchOpenSubtitles(
     iso1Langs.add('pt-br');
     iso1Langs.add('pt-pt');
   }
-  iso1Langs.add('en'); // Always include English as potential AI translation source
+  if (query.languages.includes('zho')) {
+    iso1Langs.add('zh-cn');
+    iso1Langs.add('zh-tw');
+    iso1Langs.add('ze');
+    iso1Langs.add('zh-ca');
+  }
+  if (query.languages.includes('spa')) {
+    iso1Langs.add('es');
+    iso1Langs.add('ea');
+    iso1Langs.add('sp');
+  }
 
   const params = new URLSearchParams({
     languages: Array.from(iso1Langs).join(',')

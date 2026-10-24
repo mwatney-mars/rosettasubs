@@ -32,7 +32,10 @@ export async function searchSubdl(
     subdlLangs.add('BR_PT');
     subdlLangs.add('PT');
   }
-  subdlLangs.add('EN');
+  if (query.languages.includes('zho')) {
+    subdlLangs.add('ZH');
+    subdlLangs.add('ZH_BG');
+  }
 
   const params = new URLSearchParams({
     api_key: apiKey,
