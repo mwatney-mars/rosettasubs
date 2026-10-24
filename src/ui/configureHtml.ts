@@ -4,6 +4,8 @@ import { LANGUAGES } from '../languages';
 export function renderConfigurePage(config: AddonConfig, baseUrl: string): string {
   const initialConfigJson = JSON.stringify(config).replace(/</g, '\\u003c');
   const languagesJson = JSON.stringify(LANGUAGES).replace(/</g, '\\u003c');
+  const supportUrl =
+    process.env.SUPPORT_URL || 'https://buymeacoffee.com/mwatney';
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -237,48 +239,11 @@ export function renderConfigurePage(config: AddonConfig, baseUrl: string): strin
       color: #fff;
     }
 
-    .lang-toolbar {
-      display: flex;
-      gap: 0.6rem;
-      margin-bottom: 0.85rem;
-    }
-
-    .search-wrap {
-      position: relative;
-      flex: 1;
-    }
-
-    .search-wrap svg {
-      position: absolute;
-      left: 0.8rem;
-      top: 50%;
-      transform: translateY(-50%);
-      color: var(--muted);
-      pointer-events: none;
-    }
-
-    .search-input {
-      width: 100%;
-      background: var(--input-bg);
-      border: 1px solid var(--border);
-      color: var(--text);
-      padding: 0.6rem 0.85rem 0.6rem 2.35rem;
-      border-radius: var(--radius-md);
-      font-size: 0.9rem;
-      outline: none;
-      transition: border-color 0.15s, box-shadow 0.15s;
-    }
-
-    .search-input:focus {
-      border-color: var(--accent);
-      box-shadow: 0 0 0 3px rgba(124, 92, 255, 0.15);
-    }
-
     .lang-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(175px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
       gap: 0.5rem;
-      max-height: 270px;
+      max-height: 310px;
       overflow-y: auto;
       padding: 0.25rem;
       scrollbar-width: thin;
@@ -668,6 +633,39 @@ export function renderConfigurePage(config: AddonConfig, baseUrl: string): strin
     .btn-secondary:hover {
       background: rgba(255, 255, 255, 0.11);
     }
+
+    .coffee-footer {
+      margin-top: 2rem;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.6rem;
+      color: var(--muted);
+      font-size: 0.84rem;
+    }
+
+    .coffee-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.55rem;
+      padding: 0.62rem 1.2rem;
+      border-radius: 999px;
+      background: linear-gradient(135deg, rgba(255, 221, 0, 0.14), rgba(245, 158, 11, 0.1));
+      border: 1px solid rgba(255, 221, 0, 0.35);
+      color: #fde68a;
+      font-weight: 600;
+      font-size: 0.88rem;
+      text-decoration: none;
+      transition: all 0.15s ease;
+    }
+
+    .coffee-btn:hover {
+      background: linear-gradient(135deg, rgba(255, 221, 0, 0.22), rgba(245, 158, 11, 0.18));
+      border-color: rgba(255, 221, 0, 0.6);
+      transform: translateY(-1px);
+      color: #fff;
+    }
   </style>
 </head>
 <body>
@@ -701,16 +699,6 @@ export function renderConfigurePage(config: AddonConfig, baseUrl: string): strin
       </div>
 
       <div id="selectedChips" class="selected-chips"></div>
-
-      <div class="lang-toolbar">
-        <div class="search-wrap">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="11" cy="11" r="8"></circle>
-            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-          </svg>
-          <input type="text" id="langSearch" class="search-input" placeholder="Search 34 languages by name or code (e.g. Portuguese, pob, Japanese)..." autocomplete="off" />
-        </div>
-      </div>
 
       <div id="langGrid" class="lang-grid"></div>
     </div>
@@ -876,6 +864,14 @@ export function renderConfigurePage(config: AddonConfig, baseUrl: string): strin
         <button id="copyBtn" class="btn btn-secondary" type="button">Copy Manifest URL</button>
       </div>
     </div>
+
+    <footer class="coffee-footer">
+      <a class="coffee-btn" href="${supportUrl}" target="_blank" rel="noopener noreferrer">
+        <span>&#9749;</span>
+        <span>Buy me a coffee</span>
+      </a>
+      <span>Open-source &bull; Built for the Stremio community</span>
+    </footer>
   </div>
 
   <script>
@@ -884,7 +880,6 @@ export function renderConfigurePage(config: AddonConfig, baseUrl: string): strin
     const BASE_URL = ${JSON.stringify(baseUrl.replace(/\/+$/, ''))} || window.location.origin;
 
     const langGrid = document.getElementById('langGrid');
-    const langSearch = document.getElementById('langSearch');
     const selectedChips = document.getElementById('selectedChips');
     const langCountBadge = document.getElementById('langCountBadge');
     const summaryBar = document.getElementById('summaryBar');
@@ -961,13 +956,6 @@ export function renderConfigurePage(config: AddonConfig, baseUrl: string): strin
       lbl.appendChild(codeSpan);
       langGrid.appendChild(lbl);
       pillElements.set(lang.iso639_2, { lbl, cb });
-    });
-
-    langSearch.addEventListener('input', () => {
-      const q = langSearch.value.trim().toLowerCase();
-      pillElements.forEach(({ lbl }) => {
-        lbl.style.display = !q || lbl.dataset.search.includes(q) ? '' : 'none';
-      });
     });
 
     const provWyzie = document.getElementById('provWyzie');
