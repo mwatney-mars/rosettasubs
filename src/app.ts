@@ -27,10 +27,36 @@ function resolveBaseUrl(req: Request): string {
 
 export function createApp() {
   const app = express();
+  const recentLogs: string[] = [];
+  const logEvent = (msg: string) => {
+    const entry = `${new Date().toISOString()} ${msg}`;
+    recentLogs.push(entry);
+    if (recentLogs.length > 100) recentLogs.shift();
+    if (process.env.NODE_ENV !== 'test') {
+      console.log(entry);
+    }
+  };
 
   app.set('trust proxy', true);
   app.use(cors());
   app.use(express.json({ limit: '25mb' }));
+
+  app.use((req: Request, res: Response, next) => {
+    if (req.path === '/health' || req.path === '/logo.svg') {
+      next();
+      return;
+    }
+    const start = Date.now();
+    res.on('finish', () => {
+      const ua = req.headers['user-agent'] || '-';
+      const shortPath =
+        req.originalUrl.length > 140 ? `${req.originalUrl.slice(0, 140)}...` : req.originalUrl;
+      logEvent(
+        `[HTTP] ${req.method} ${shortPath} -> ${res.statusCode} (${Date.now() - start}ms) ua="${ua}"`
+      );
+    });
+    next();
+  });
 
   app.get('/', (_req: Request, res: Response) => {
     res.redirect('/configure');
@@ -42,7 +68,8 @@ export function createApp() {
       cache: {
         search: searchCache.stats(),
         subtitles: subtitleContentCache.stats()
-      }
+      },
+      recentLogs
     });
   });
 
@@ -75,6 +102,13 @@ export function createApp() {
       const baseUrl = resolveBaseUrl(req);
       const subtitles = await getStremioSubtitles(query, config, baseUrl);
 
+      logEvent(
+        `[SUBTITLES] type=${type} id=${rawId} extra=${rawExtra || '-'} langs=${config.languages.join(',')} count=${subtitles.length} sample=${subtitles
+          .slice(0, 5)
+          .map((s) => `${s.id}(${s.lang})`)
+          .join(',')}`
+      );
+
       res.setHeader('Cache-Control', 'public, max-age=900, stale-while-revalidate=1800');
       res.json({
         subtitles,
@@ -82,7 +116,8 @@ export function createApp() {
         staleRevalidate: 1800,
         staleError: 86400
       });
-    } catch {
+    } catch (err) {
+      logEvent(`[SUBTITLES-ERR] ${err instanceof Error ? err.message : String(err)}`);
       res.json({ subtitles: [] });
     }
   };
@@ -95,17 +130,22 @@ export function createApp() {
   app.get('/sub/:token', async (req: Request, res: Response) => {
     const payload = decodeProxyToken(req.params.token);
     if (!payload || !payload.u) {
+      logEvent(`[SUB-400] invalid token=${req.params.token.slice(0, 30)}`);
       res.status(400).send('Invalid subtitle token');
       return;
     }
 
     try {
       const srt = await fetchAndNormalizeSubtitle(payload);
+      logEvent(
+        `[SUB-OK] u=${payload.u} fb=${payload.fb || '-'} bytes=${Buffer.byteLength(srt, 'utf8')} se=${payload.se ?? '-'} ep=${payload.ep ?? '-'}`
+      );
       res.setHeader('Content-Type', 'application/x-subrip; charset=utf-8');
       res.setHeader('Cache-Control', 'public, max-age=86400');
       res.send(srt);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Subtitle fetch failed';
+      logEvent(`[SUB-ERR] u=${payload.u} fb=${payload.fb || '-'} err="${msg}"`);
       res.status(502).send(msg);
     }
   });
