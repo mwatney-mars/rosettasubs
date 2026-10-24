@@ -184,11 +184,17 @@ export function createApp() {
         subtitleContentCache.set(cacheKey, translatedSrt);
       }
 
+      logEvent(
+        `[TRANSLATE-OK] provider=${payload.aiProvider} ${payload.fromLang}->${payload.toLang} u=${payload.src.u} bytes=${Buffer.byteLength(translatedSrt, 'utf8')}`
+      );
       res.setHeader('Content-Type', 'application/x-subrip; charset=utf-8');
       res.setHeader('Cache-Control', 'public, max-age=86400');
       res.send(translatedSrt);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Subtitle translation failed';
+      logEvent(
+        `[TRANSLATE-ERR] provider=${payload.aiProvider} ${payload.fromLang}->${payload.toLang} u=${payload.src.u} err="${msg.replace(/\s+/g, ' ').slice(0, 300)}"`
+      );
       res.status(502).send(msg);
     }
   });

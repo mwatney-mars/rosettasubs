@@ -28,12 +28,12 @@ interface CueBatchItem {
   t: string;
 }
 
-async function callGeminiJson(
+async function callGeminiEndpoint(
   prompt: string,
   apiKey: string,
-  model = 'gemini-2.0-flash',
-  baseUrl = 'https://generativelanguage.googleapis.com/v1beta'
-): Promise<string> {
+  model: string,
+  baseUrl: string
+): Promise<Response> {
   const url = `${baseUrl.replace(/\/+$/, '')}/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
   const generationConfig: Record<string, unknown> = {
     temperature: 0.1,
@@ -43,7 +43,7 @@ async function callGeminiJson(
     generationConfig.thinkingConfig = { thinkingBudget: 0 };
   }
 
-  const res = await fetch(url, {
+  return fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -51,16 +51,39 @@ async function callGeminiJson(
       generationConfig
     })
   });
+}
 
-  if (!res.ok) {
-    const errText = await res.text().catch(() => '');
-    throw new Error(`Gemini API error (${res.status}): ${errText.slice(0, 200)}`);
+async function callGeminiJson(
+  prompt: string,
+  apiKey: string,
+  model = 'gemini-2.0-flash',
+  baseUrl?: string
+): Promise<string> {
+  const candidateBaseUrls = baseUrl
+    ? [baseUrl]
+    : apiKey.startsWith('AQ.')
+      ? [
+          'https://aiplatform.googleapis.com/v1/publishers/google',
+          'https://generativelanguage.googleapis.com/v1beta'
+        ]
+      : ['https://generativelanguage.googleapis.com/v1beta'];
+
+  let lastStatus = 500;
+  let lastErrText = '';
+
+  for (const candidateUrl of candidateBaseUrls) {
+    const res = await callGeminiEndpoint(prompt, apiKey, model, candidateUrl);
+    if (res.ok) {
+      const data = (await res.json()) as {
+        candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+      };
+      return data.candidates?.[0]?.content?.parts?.[0]?.text || '[]';
+    }
+    lastStatus = res.status;
+    lastErrText = await res.text().catch(() => '');
   }
 
-  const data = (await res.json()) as {
-    candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
-  };
-  return data.candidates?.[0]?.content?.parts?.[0]?.text || '[]';
+  throw new Error(`Gemini API error (${lastStatus}): ${lastErrText.slice(0, 800)}`);
 }
 
 async function callOpenAiJson(
@@ -108,12 +131,36 @@ function parseJsonBatchResponse(rawText: string): CueBatchItem[] {
     .replace(/\s*```$/, '')
     .trim();
 
-  const parsed = JSON.parse(cleaned) as unknown;
-  if (Array.isArray(parsed)) {
-    return parsed as CueBatchItem[];
-  }
-  if (parsed && typeof parsed === 'object' && 'items' in parsed && Array.isArray((parsed as { items: unknown }).items)) {
-    return (parsed as { items: CueBatchItem[] }).items;
+  try {
+    const parsed = JSON.parse(cleaned) as unknown;
+    if (Array.isArray(parsed)) {
+      return parsed as CueBatchItem[];
+    }
+    if (
+      parsed &&
+      typeof parsed === 'object' &&
+      'items' in parsed &&
+      Array.isArray((parsed as { items: unknown }).items)
+    ) {
+      return (parsed as { items: CueBatchItem[] }).items;
+    }
+  } catch {
+    const recovered: CueBatchItem[] = [];
+    const itemRe = /\{\s*"i"\s*:\s*(\d+)\s*,\s*"t"\s*:\s*"((?:[^"\\]|\\.)*)"\s*\}/g;
+    let match: RegExpExecArray | null;
+    while ((match = itemRe.exec(cleaned)) !== null) {
+      try {
+        recovered.push({
+          i: Number(match[1]),
+          t: JSON.parse(`"${match[2]}"`) as string
+        });
+      } catch {
+        // ignore unparseable cue fragment
+      }
+    }
+    if (recovered.length > 0) {
+      return recovered;
+    }
   }
   return [];
 }
@@ -156,7 +203,7 @@ async function translateBatch(
           prompt,
           apiKey,
           options.model || 'gemini-2.0-flash',
-          options.baseUrl || 'https://generativelanguage.googleapis.com/v1beta'
+          options.baseUrl
         );
 
   const items = parseJsonBatchResponse(rawJson);
@@ -175,7 +222,7 @@ export async function translateSrtContent(options: TranslateOptions): Promise<st
 
   const fromName = getLanguageName(options.fromLang);
   const toName = getLanguageName(options.toLang);
-  const batchSize = options.batchSize ?? 250;
+  const batchSize = options.batchSize ?? 90;
 
   const batches: SrtCue[][] = [];
   for (let i = 0; i < cues.length; i += batchSize) {
@@ -183,17 +230,27 @@ export async function translateSrtContent(options: TranslateOptions): Promise<st
   }
 
   const translatedMap = new Map<number, string>();
-  const concurrency = 8;
+  const concurrency = 16;
+  let firstError: Error | undefined;
+  let succeededBatches = 0;
 
   for (let i = 0; i < batches.length; i += concurrency) {
     const slice = batches.slice(i, i + concurrency);
-    const results = await Promise.all(
+    const settled = await Promise.allSettled(
       slice.map((batch) => translateBatch(batch, fromName, toName, options))
     );
-    for (const batchMap of results) {
-      for (const [idx, text] of batchMap.entries()) {
-        translatedMap.set(idx, text);
+    for (const res of settled) {
+      if (res.status === 'fulfilled') {
+        succeededBatches++;
+        for (const [idx, text] of res.value.entries()) {
+          translatedMap.set(idx, text);
+        }
+      } else if (!firstError) {
+        firstError = res.reason instanceof Error ? res.reason : new Error(String(res.reason));
       }
+    }
+    if (succeededBatches === 0 && firstError) {
+      throw firstError;
     }
   }
 
@@ -243,7 +300,7 @@ async function annotateBatch(
           prompt,
           apiKey,
           options.model || 'gemini-2.0-flash',
-          options.baseUrl || 'https://generativelanguage.googleapis.com/v1beta'
+          options.baseUrl
         );
 
   const items = parseJsonBatchResponse(rawJson);
@@ -343,7 +400,7 @@ export async function transcribeMediaToSrt(
 
   if (!res.ok) {
     const errText = await res.text().catch(() => '');
-    throw new Error(`Gemini multimodal transcription error (${res.status}): ${errText.slice(0, 200)}`);
+    throw new Error(`Gemini multimodal transcription error (${res.status}): ${errText.slice(0, 800)}`);
   }
 
   const data = (await res.json()) as {
