@@ -205,6 +205,93 @@ export async function translateSrtContent(options: TranslateOptions): Promise<st
   return serializeSrt(translatedCues);
 }
 
+async function annotateBatch(
+  batch: SrtCue[],
+  fromLangName: string,
+  toLangName: string,
+  options: TranslateOptions
+): Promise<Map<number, string>> {
+  const payload: CueBatchItem[] = batch.map((c) => ({ i: c.index, t: c.text }));
+  const prompt = [
+    `Analyze the following ${fromLangName} subtitle lines for a language learner whose native language is ${toLangName}.`,
+    `For lines containing B2/C1 slang, idioms, or non-literal expressions, append a short inline note at the end in brackets: " [term: ${toLangName} meaning]".`,
+    'Omit lines that do not contain B2/C1 idioms or slang.',
+    'Return ONLY a JSON array of objects for the annotated lines: [{"i": 1, "t": "original text [idiom: meaning]"}]',
+    '',
+    JSON.stringify(payload)
+  ].join('\n');
+
+  const apiKey =
+    options.apiKey ||
+    (options.aiProvider === 'openai'
+      ? process.env.OPENAI_API_KEY
+      : process.env.GEMINI_API_KEY);
+
+  if (!apiKey) {
+    throw new Error(`Missing API key for AI provider: ${options.aiProvider}`);
+  }
+
+  const rawJson =
+    options.aiProvider === 'openai'
+      ? await callOpenAiJson(
+          prompt,
+          apiKey,
+          options.model || 'gpt-4o-mini',
+          options.baseUrl || 'https://api.openai.com/v1'
+        )
+      : await callGeminiJson(
+          prompt,
+          apiKey,
+          options.model || 'gemini-2.0-flash',
+          options.baseUrl || 'https://generativelanguage.googleapis.com/v1beta'
+        );
+
+  const items = parseJsonBatchResponse(rawJson);
+  const map = new Map<number, string>();
+  for (const item of items) {
+    if (typeof item.i === 'number' && typeof item.t === 'string') {
+      map.set(item.i, item.t);
+    }
+  }
+  return map;
+}
+
+export async function annotateSrtIdioms(options: TranslateOptions): Promise<string> {
+  const cues = parseSrt(options.srtContent);
+  if (cues.length === 0) return options.srtContent;
+
+  const fromName = getLanguageName(options.fromLang);
+  const toName = getLanguageName(options.toLang);
+  const batchSize = options.batchSize ?? 250;
+
+  const batches: SrtCue[][] = [];
+  for (let i = 0; i < cues.length; i += batchSize) {
+    batches.push(cues.slice(i, i + batchSize));
+  }
+
+  const annotatedMap = new Map<number, string>();
+  const concurrency = 8;
+
+  for (let i = 0; i < batches.length; i += concurrency) {
+    const slice = batches.slice(i, i + concurrency);
+    const results = await Promise.all(
+      slice.map((batch) => annotateBatch(batch, fromName, toName, options))
+    );
+    for (const batchMap of results) {
+      for (const [idx, text] of batchMap.entries()) {
+        annotatedMap.set(idx, text);
+      }
+    }
+  }
+
+  const annotatedCues: SrtCue[] = cues.map((cue) => ({
+    ...cue,
+    text: annotatedMap.get(cue.index) || cue.text
+  }));
+
+  return serializeSrt(annotatedCues);
+}
+
 export async function transcribeMediaToSrt(
   options: MultimodalTranscribeOptions
 ): Promise<string> {

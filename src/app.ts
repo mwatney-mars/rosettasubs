@@ -1,11 +1,18 @@
 import express, { Request, Response } from 'express';
 import cors from 'cors';
-import { decodeConfig, decodeProxyToken, decodeTranslateToken } from './config';
+import {
+  decodeConfig,
+  decodeDualToken,
+  decodeProxyToken,
+  decodeTranslateToken
+} from './config';
 import { buildManifest } from './manifest';
 import { renderConfigurePage } from './ui/configureHtml';
+import { LOGO_SVG } from './ui/logo';
 import { getStremioSubtitles, parseStremioSubtitleRequest } from './providers';
 import { fetchAndNormalizeSubtitle } from './providers/fetcher';
-import { transcribeMediaToSrt, translateSrtContent } from './ai/multimodal';
+import { annotateSrtIdioms, transcribeMediaToSrt, translateSrtContent } from './ai/multimodal';
+import { mergeDualSrt } from './subtitleConverter';
 import { searchCache, subtitleContentCache } from './cache';
 
 function resolveBaseUrl(req: Request): string {
@@ -39,6 +46,12 @@ export function createApp() {
     });
   });
 
+  app.get('/logo.svg', (_req: Request, res: Response) => {
+    res.setHeader('Content-Type', 'image/svg+xml; charset=utf-8');
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    res.send(LOGO_SVG);
+  });
+
   app.get(['/configure', '/:config/configure'], (req: Request, res: Response) => {
     const config = decodeConfig(req.params.config);
     const baseUrl = resolveBaseUrl(req);
@@ -48,7 +61,7 @@ export function createApp() {
 
   app.get(['/manifest.json', '/:config/manifest.json'], (req: Request, res: Response) => {
     const config = decodeConfig(req.params.config);
-    res.json(buildManifest(config, Boolean(req.params.config)));
+    res.json(buildManifest(config, Boolean(req.params.config), resolveBaseUrl(req)));
   });
 
   const handleSubtitles = async (req: Request, res: Response) => {
@@ -134,6 +147,99 @@ export function createApp() {
       res.send(translatedSrt);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Subtitle translation failed';
+      res.status(502).send(msg);
+    }
+  });
+
+  app.get('/dual/:token', async (req: Request, res: Response) => {
+    const payload = decodeDualToken(req.params.token);
+    if (
+      !payload ||
+      (!payload.primary && !payload.secondary) ||
+      !payload.primaryLang ||
+      !payload.secondaryLang
+    ) {
+      res.status(400).send('Invalid dual subtitle token');
+      return;
+    }
+
+    const cacheKey = [
+      'dual',
+      payload.primary?.u ?? '',
+      payload.secondary?.u ?? '',
+      payload.primaryLang,
+      payload.secondaryLang,
+      payload.annotate ? 'ann1' : 'ann0',
+      payload.aiProvider ?? '',
+      payload.aiModel ?? '',
+      payload.primary?.se ?? payload.secondary?.se ?? '',
+      payload.primary?.ep ?? payload.secondary?.ep ?? ''
+    ].join(':');
+
+    const cached = subtitleContentCache.get(cacheKey);
+    if (cached) {
+      res.setHeader('Content-Type', 'application/x-subrip; charset=utf-8');
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+      res.send(cached);
+      return;
+    }
+
+    try {
+      const aiProvider = payload.aiProvider || 'gemini';
+      let primarySrt = '';
+      let secondarySrt = '';
+
+      if (payload.primary && payload.secondary) {
+        [primarySrt, secondarySrt] = await Promise.all([
+          fetchAndNormalizeSubtitle(payload.primary),
+          fetchAndNormalizeSubtitle(payload.secondary)
+        ]);
+      } else if (payload.primary) {
+        primarySrt = await fetchAndNormalizeSubtitle(payload.primary);
+        secondarySrt = await translateSrtContent({
+          srtContent: primarySrt,
+          fromLang: payload.primaryLang,
+          toLang: payload.secondaryLang,
+          aiProvider,
+          apiKey: payload.aiApiKey,
+          model: payload.aiModel,
+          baseUrl: payload.aiBaseUrl
+        });
+      } else if (payload.secondary) {
+        secondarySrt = await fetchAndNormalizeSubtitle(payload.secondary);
+        primarySrt = await translateSrtContent({
+          srtContent: secondarySrt,
+          fromLang: payload.secondaryLang,
+          toLang: payload.primaryLang,
+          aiProvider,
+          apiKey: payload.aiApiKey,
+          model: payload.aiModel,
+          baseUrl: payload.aiBaseUrl
+        });
+      }
+
+      if (payload.annotate) {
+        primarySrt = await annotateSrtIdioms({
+          srtContent: primarySrt,
+          fromLang: payload.primaryLang,
+          toLang: payload.secondaryLang,
+          aiProvider,
+          apiKey: payload.aiApiKey,
+          model: payload.aiModel,
+          baseUrl: payload.aiBaseUrl
+        });
+      }
+
+      const merged = mergeDualSrt(primarySrt, secondarySrt);
+      if (merged.trim()) {
+        subtitleContentCache.set(cacheKey, merged);
+      }
+
+      res.setHeader('Content-Type', 'application/x-subrip; charset=utf-8');
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+      res.send(merged);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Dual subtitle generation failed';
       res.status(502).send(msg);
     }
   });

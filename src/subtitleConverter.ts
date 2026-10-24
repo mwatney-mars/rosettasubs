@@ -452,3 +452,137 @@ export function normalizeToSrt(content: string, formatHint?: string): string {
 
   return trimmed + '\n';
 }
+
+export function srtTimeToMs(timeStr: string): number {
+  const norm = normalizeVttTime(timeStr);
+  const match = norm.match(/^(\d{2}):(\d{2}):(\d{2}),(\d{3})$/);
+  if (!match) return 0;
+  const hh = parseInt(match[1], 10);
+  const mm = parseInt(match[2], 10);
+  const ss = parseInt(match[3], 10);
+  const ms = parseInt(match[4], 10);
+  return ((hh * 3600 + mm * 60 + ss) * 1000) + ms;
+}
+
+function collapseCueLine(text: string): string {
+  return text
+    .replace(/\r\n?/g, '\n')
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .join(' ');
+}
+
+export function mergeDualSrt(primarySrt: string, secondarySrt: string): string {
+  const primaryCues = parseSrt(primarySrt);
+  const secondaryCues = parseSrt(secondarySrt);
+
+  if (primaryCues.length === 0) return secondarySrt;
+  if (secondaryCues.length === 0) return primarySrt;
+
+  const pTimed = primaryCues.map((c) => {
+    const startMs = srtTimeToMs(c.startTime);
+    const endMs = Math.max(startMs + 1, srtTimeToMs(c.endTime));
+    return { cue: c, startMs, endMs, midMs: (startMs + endMs) / 2 };
+  });
+
+  const sTimed = secondaryCues.map((c) => {
+    const startMs = srtTimeToMs(c.startTime);
+    const endMs = Math.max(startMs + 1, srtTimeToMs(c.endTime));
+    return { cue: c, startMs, endMs, midMs: (startMs + endMs) / 2 };
+  });
+
+  const matchedSecondaryByPrimary = new Map<number, string[]>();
+  const unmatchedSecondary: typeof sTimed = [];
+
+  for (const s of sTimed) {
+    let bestPrimaryIdx = -1;
+    let bestOverlap = 0;
+    let hasAnyOverlap = false;
+
+    for (let i = 0; i < pTimed.length; i++) {
+      const p = pTimed[i];
+      if (p.endMs < s.startMs - 1000) continue;
+      if (p.startMs > s.endMs + 1000) break;
+
+      const overlap = Math.max(0, Math.min(p.endMs, s.endMs) - Math.max(p.startMs, s.startMs));
+      if (overlap > 0) {
+        hasAnyOverlap = true;
+        const minDur = Math.min(p.endMs - p.startMs, s.endMs - s.startMs);
+        if ((overlap >= 100 || overlap / minDur >= 0.2) && overlap > bestOverlap) {
+          bestOverlap = overlap;
+          bestPrimaryIdx = i;
+        }
+      }
+    }
+
+    if (bestPrimaryIdx === -1) {
+      let closestDist = Infinity;
+      for (let i = 0; i < pTimed.length; i++) {
+        const p = pTimed[i];
+        if (p.endMs < s.startMs - 1000) continue;
+        if (p.startMs > s.endMs + 1000) break;
+
+        const midDist = Math.abs(p.midMs - s.midMs);
+        const startDist = Math.abs(p.startMs - s.startMs);
+        if (midDist <= 600 && startDist <= 800 && midDist < closestDist) {
+          closestDist = midDist;
+          bestPrimaryIdx = i;
+        }
+      }
+    }
+
+    if (bestPrimaryIdx !== -1) {
+      const list = matchedSecondaryByPrimary.get(bestPrimaryIdx) || [];
+      const cleanLine = collapseCueLine(s.cue.text);
+      if (cleanLine && !list.includes(cleanLine)) {
+        list.push(cleanLine);
+      }
+      matchedSecondaryByPrimary.set(bestPrimaryIdx, list);
+    } else if (!hasAnyOverlap) {
+      unmatchedSecondary.push(s);
+    }
+  }
+
+  const combined: { startMs: number; startTime: string; endTime: string; text: string }[] = [];
+
+  for (let i = 0; i < pTimed.length; i++) {
+    const p = pTimed[i];
+    const pText = collapseCueLine(p.cue.text);
+    const sLines = matchedSecondaryByPrimary.get(i);
+    const text =
+      sLines && sLines.length > 0
+        ? `<b>${pText}</b>\n<font color="#999999">${sLines.join(' ')}</font>`
+        : `<b>${pText}</b>`;
+
+    combined.push({
+      startMs: p.startMs,
+      startTime: p.cue.startTime,
+      endTime: p.cue.endTime,
+      text
+    });
+  }
+
+  for (const s of unmatchedSecondary) {
+    const sText = collapseCueLine(s.cue.text);
+    if (sText) {
+      combined.push({
+        startMs: s.startMs,
+        startTime: s.cue.startTime,
+        endTime: s.cue.endTime,
+        text: `<font color="#999999">${sText}</font>`
+      });
+    }
+  }
+
+  combined.sort((a, b) => a.startMs - b.startMs);
+
+  return serializeSrt(
+    combined.map((item, idx) => ({
+      index: idx + 1,
+      startTime: item.startTime,
+      endTime: item.endTime,
+      text: item.text
+    }))
+  );
+}

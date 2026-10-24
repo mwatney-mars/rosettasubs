@@ -21,19 +21,28 @@ export interface StremioManifest {
   };
 }
 
-export function buildManifest(config: AddonConfig, isConfigured = false): StremioManifest {
+export function buildManifest(
+  config: AddonConfig,
+  isConfigured = false,
+  baseUrl?: string
+): StremioManifest {
   const baseDescription =
-    'Subtitles in 30+ languages from OpenSubtitles, SubDL, and Wyzie — with instant AI translation when subtitles are missing in your language.';
+    'Subtitles in 30+ languages from OpenSubtitles, SubDL, and Wyzie — with dual-language immersion tracks and instant AI translation when subtitles are missing in your language.';
   const langNames = config.languages.map((l) => getLanguageName(l)).join(', ');
+  const dualSuffix = config.dualSubtitles
+    ? ` Dual-language immersion enabled (${getLanguageName(config.dualSubtitlesNativeLang || 'eng')} reference).`
+    : '';
   const description = isConfigured
-    ? `${baseDescription} Configured for: ${langNames}.`
+    ? `${baseDescription} Configured for: ${langNames}.${dualSuffix}`
     : baseDescription;
+  const cleanBase = baseUrl ? baseUrl.replace(/\/+$/, '') : '';
 
   return {
     id: 'org.stremio.rosettasubs',
     version: '1.0.0',
     name: 'RosettaSubs',
     description,
+    logo: `${cleanBase}/logo.svg`,
     resources: ['subtitles'],
     types: ['movie', 'series'],
     idPrefixes: ['tt'],

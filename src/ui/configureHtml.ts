@@ -12,6 +12,7 @@ export function renderConfigurePage(config: AddonConfig, baseUrl: string): strin
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" type="image/svg+xml" href="/logo.svg" />
   <title>RosettaSubs — Stremio Subtitles Configuration</title>
   <style>
     :root {
@@ -671,6 +672,9 @@ export function renderConfigurePage(config: AddonConfig, baseUrl: string): strin
 <body>
   <div class="container">
     <header class="hero">
+      <div style="margin-bottom:0.85rem;">
+        <img src="/logo.svg" alt="RosettaSubs Logo" width="68" height="68" style="border-radius:16px;box-shadow:0 8px 28px rgba(124,92,255,0.28);" />
+      </div>
       <div class="brand-badge">
         <span class="brand-icon">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -680,9 +684,10 @@ export function renderConfigurePage(config: AddonConfig, baseUrl: string): strin
         <span>Stremio Subtitles Add-on v1.0</span>
       </div>
       <h1>RosettaSubs</h1>
-      <p class="subtitle">Multi-provider subtitles in 34 languages with automatic AI translation fallback when native tracks are missing.</p>
+      <p class="subtitle">Subtitles in 30+ languages from OpenSubtitles, SubDL, and Wyzie — with dual-language immersion tracks and instant AI translation when subtitles are missing in your language.</p>
       <div class="trust-strip">
         <span class="trust-pill"><span class="trust-dot"></span> Stateless &amp; Zero-Storage</span>
+        <span class="trust-pill"><span class="trust-dot"></span> Dual-Language Immersion</span>
         <span class="trust-pill"><span class="trust-dot"></span> Auto UTF-8 &amp; SRT Normalization</span>
         <span class="trust-pill"><span class="trust-dot"></span> MovieHash Sync</span>
       </div>
@@ -838,6 +843,29 @@ export function renderConfigurePage(config: AddonConfig, baseUrl: string): strin
             <div class="switch-sub">Keep subtitle tracks that include sound-effect descriptions and speaker cues.</div>
           </div>
         </label>
+
+        <label class="switch-card">
+          <input type="checkbox" id="dualSubtitles" />
+          <div>
+            <div class="switch-title">Dual-Language Immersion Subtitles</div>
+            <div class="switch-sub">Timestamp-aligns target language on top with your native reference language below.</div>
+          </div>
+        </label>
+
+        <label class="switch-card">
+          <input type="checkbox" id="dualSubtitlesAnnotate" />
+          <div>
+            <div class="switch-title">Inline B2/C1 Idiom Annotations</div>
+            <div class="switch-sub">Uses AI to append concise inline notes for non-literal slang or idioms on dual tracks.</div>
+          </div>
+        </label>
+      </div>
+
+      <div id="dualDetails" class="field-grid ai-details" style="margin-top:0.85rem;">
+        <label class="field">
+          <span>Native Reference Language (Bottom Line)</span>
+          <select id="dualSubtitlesNativeLang"></select>
+        </label>
       </div>
     </div>
 
@@ -969,6 +997,16 @@ export function renderConfigurePage(config: AddonConfig, baseUrl: string): strin
     const aiModel = document.getElementById('aiModel');
     const proxySubtitles = document.getElementById('proxySubtitles');
     const includeHi = document.getElementById('includeHi');
+    const dualSubtitles = document.getElementById('dualSubtitles');
+    const dualSubtitlesNativeLang = document.getElementById('dualSubtitlesNativeLang');
+    const dualSubtitlesAnnotate = document.getElementById('dualSubtitlesAnnotate');
+
+    LANGUAGES.forEach((lang) => {
+      const opt = document.createElement('option');
+      opt.value = lang.iso639_2;
+      opt.textContent = lang.name + ' (' + lang.iso639_2.toUpperCase() + ')';
+      dualSubtitlesNativeLang.appendChild(opt);
+    });
 
     provWyzie.checked = INITIAL_CONFIG.providers.includes('wyzie');
     provOs.checked = INITIAL_CONFIG.providers.includes('opensubtitles');
@@ -981,6 +1019,9 @@ export function renderConfigurePage(config: AddonConfig, baseUrl: string): strin
     aiModel.value = INITIAL_CONFIG.aiModel || '';
     proxySubtitles.checked = INITIAL_CONFIG.proxySubtitles !== false;
     includeHi.checked = INITIAL_CONFIG.includeHearingImpaired !== false;
+    dualSubtitles.checked = Boolean(INITIAL_CONFIG.dualSubtitles);
+    dualSubtitlesNativeLang.value = INITIAL_CONFIG.dualSubtitlesNativeLang || 'eng';
+    dualSubtitlesAnnotate.checked = Boolean(INITIAL_CONFIG.dualSubtitlesAnnotate);
 
     // Auto-enable provider checkbox when user enters an API key
     osKey.addEventListener('input', () => {
@@ -1003,7 +1044,7 @@ export function renderConfigurePage(config: AddonConfig, baseUrl: string): strin
       });
     });
 
-    [provWyzie, provOs, provSubdl, osKey, subdlKey, aiMode, aiProvider, aiApiKey, aiModel, proxySubtitles, includeHi].forEach((el) => {
+    [provWyzie, provOs, provSubdl, osKey, subdlKey, aiMode, aiProvider, aiApiKey, aiModel, proxySubtitles, includeHi, dualSubtitles, dualSubtitlesNativeLang, dualSubtitlesAnnotate].forEach((el) => {
       el.addEventListener('input', updateLinks);
       el.addEventListener('change', updateLinks);
     });
@@ -1028,7 +1069,10 @@ export function renderConfigurePage(config: AddonConfig, baseUrl: string): strin
         aiProvider: aiProvider.value,
         aiMode: aiMode.value,
         proxySubtitles: proxySubtitles.checked,
-        includeHearingImpaired: includeHi.checked
+        includeHearingImpaired: includeHi.checked,
+        dualSubtitles: dualSubtitles.checked,
+        dualSubtitlesNativeLang: dualSubtitlesNativeLang.value || 'eng',
+        dualSubtitlesAnnotate: dualSubtitlesAnnotate.checked
       };
       if (osKey.value.trim()) cfg.openSubtitlesApiKey = osKey.value.trim();
       if (subdlKey.value.trim()) cfg.subdlApiKey = subdlKey.value.trim();
@@ -1045,6 +1089,9 @@ export function renderConfigurePage(config: AddonConfig, baseUrl: string): strin
       const aiDetails = document.getElementById('aiDetails');
       aiDetails.classList.toggle('disabled', cfg.aiMode === 'off');
 
+      const dualDetails = document.getElementById('dualDetails');
+      dualDetails.classList.toggle('disabled', !cfg.dualSubtitles);
+
       const aiKeyHelpLink = document.getElementById('aiKeyHelpLink');
       if (cfg.aiProvider === 'openai') {
         aiKeyHelpLink.href = 'https://platform.openai.com/api-keys';
@@ -1058,10 +1105,14 @@ export function renderConfigurePage(config: AddonConfig, baseUrl: string): strin
 
       const langNames = cfg.languages.map((c) => (langByCode.get(c) ? langByCode.get(c).name : c)).join(', ');
       const aiSummary = cfg.aiMode === 'off' ? 'Off' : (cfg.aiProvider === 'openai' ? 'OpenAI' : 'Gemini') + ' (' + cfg.aiMode + ')';
+      const dualSummary = cfg.dualSubtitles
+        ? '<span class="summary-item"><strong>Dual Subs:</strong> ' + (langByCode.get(cfg.dualSubtitlesNativeLang) ? langByCode.get(cfg.dualSubtitlesNativeLang).name : cfg.dualSubtitlesNativeLang) + '</span>'
+        : '';
       summaryBar.innerHTML =
         '<span class="summary-item"><strong>Languages:</strong> ' + langNames + '</span>' +
         '<span class="summary-item"><strong>Sources:</strong> ' + cfg.providers.length + ' active</span>' +
-        '<span class="summary-item"><strong>AI Translation:</strong> ' + aiSummary + '</span>';
+        '<span class="summary-item"><strong>AI Translation:</strong> ' + aiSummary + '</span>' +
+        dualSummary;
     }
 
     function updateLinks() {

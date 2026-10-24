@@ -16,6 +16,9 @@ export interface AddonConfig {
   aiMode: AIMode;
   proxySubtitles: boolean;
   includeHearingImpaired: boolean;
+  dualSubtitles: boolean;
+  dualSubtitlesNativeLang: string;
+  dualSubtitlesAnnotate?: boolean;
 }
 
 export interface StremioSubtitle {
@@ -77,6 +80,18 @@ export interface TranslateTokenPayload {
   fromLang: string;
   toLang: string;
   aiProvider: AIProviderName;
+  aiApiKey?: string;
+  aiModel?: string;
+  aiBaseUrl?: string;
+}
+
+export interface DualTokenPayload {
+  primary?: ProxyTokenPayload;
+  secondary?: ProxyTokenPayload;
+  primaryLang: string;
+  secondaryLang: string;
+  annotate?: boolean;
+  aiProvider?: AIProviderName;
   aiApiKey?: string;
   aiModel?: string;
   aiBaseUrl?: string;

@@ -6,6 +6,7 @@ import { createApp } from '../src/app';
 import {
   decodeConfig,
   encodeConfig,
+  encodeDualToken,
   encodeProxyToken,
   encodeTranslateToken
 } from '../src/config';
@@ -15,6 +16,7 @@ import {
   assToSrt,
   decodeSubtitleBuffer,
   extractSubtitleFromZip,
+  mergeDualSrt,
   normalizeToSrt,
   parseSrt,
   subToSrt,
@@ -163,6 +165,38 @@ describe('Subtitle Encoding & Format Normalization', () => {
     expect(extracted).not.toBeNull();
     expect(normalizeToSrt(extracted!.buffer.toString('utf8'))).toContain('From ZIP');
   });
+
+  it('timestamp-aligns and merges two SRT tracks into a dual-language SRT', () => {
+    const primary = [
+      '1',
+      '00:00:01,000 --> 00:00:03,000',
+      '目が覚めたか、ネオ。',
+      '',
+      '2',
+      '00:00:05,000 --> 00:00:08,500',
+      '白ウサギを追え。'
+    ].join('\n');
+
+    const secondary = [
+      '1',
+      '00:00:01,150 --> 00:00:02,900',
+      'Wake up, Neo.',
+      '',
+      '2',
+      '00:00:05,000 --> 00:00:06,600',
+      'Follow the',
+      '',
+      '3',
+      '00:00:06,700 --> 00:00:08,400',
+      'white rabbit.'
+    ].join('\n');
+
+    const merged = mergeDualSrt(primary, secondary);
+    const cues = parseSrt(merged);
+    expect(cues).toHaveLength(2);
+    expect(cues[0].text).toBe('<b>目が覚めたか、ネオ。</b>\n<font color="#999999">Wake up, Neo.</font>');
+    expect(cues[1].text).toBe('<b>白ウサギを追え。</b>\n<font color="#999999">Follow the white rabbit.</font>');
+  });
 });
 
 describe('Express Stremio Add-on Routes & Multimodal AI Flow', () => {
@@ -192,16 +226,24 @@ describe('Express Stremio Add-on Routes & Multimodal AI Flow', () => {
     expect(parsed.filename).toBe('GOT.S01E02.mkv');
   });
 
-  it('serves /manifest.json and /:config/manifest.json', async () => {
+  it('serves /manifest.json, /:config/manifest.json, and /logo.svg', async () => {
     const res1 = await request(app).get('/manifest.json');
     expect(res1.status).toBe(200);
     expect(res1.body.id).toBe('org.stremio.rosettasubs');
     expect(res1.body.resources).toContain('subtitles');
+    expect(res1.body.logo).toContain('/logo.svg');
+    expect(res1.body.description).toContain('dual-language immersion tracks');
 
-    const cfg = encodeConfig({ languages: ['jpn'], providers: ['wyzie'] });
+    const logoRes = await request(app).get('/logo.svg');
+    expect(logoRes.status).toBe(200);
+    expect(logoRes.headers['content-type']).toContain('image/svg+xml');
+    expect(Buffer.from(logoRes.body).toString('utf8')).toContain('<svg');
+
+    const cfg = encodeConfig({ languages: ['jpn'], providers: ['wyzie'], dualSubtitles: true });
     const res2 = await request(app).get(`/${cfg}/manifest.json`);
     expect(res2.status).toBe(200);
     expect(res2.body.description).toContain('Japanese');
+    expect(res2.body.description).toContain('Dual-language immersion enabled');
   });
 
   it('serves /configure HTML UI', async () => {
@@ -343,5 +385,99 @@ describe('Express Stremio Add-on Routes & Multimodal AI Flow', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.srt).toContain('Transcribed from audio');
+  });
+
+  it('emits dual-language subtitle tracks and merges + annotates via /dual/:token.srt', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes('sub.wyzie.ru')) {
+        return new Response(
+          JSON.stringify([
+            {
+              id: 'w-es',
+              url: 'https://example.com/sub-es.srt',
+              language: 'es',
+              format: 'srt',
+              encoding: 'UTF-8'
+            },
+            {
+              id: 'w-en',
+              url: 'https://example.com/sub-en.srt',
+              language: 'en',
+              format: 'srt',
+              encoding: 'UTF-8'
+            }
+          ]),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+      if (url === 'https://example.com/sub-es.srt') {
+        return new Response('1\n00:00:01,000 --> 00:00:03,000\nNo manches, güey.\n', {
+          status: 200
+        });
+      }
+      if (url === 'https://example.com/sub-en.srt') {
+        return new Response('1\n00:00:01,100 --> 00:00:02,900\nNo way, dude.\n', {
+          status: 200
+        });
+      }
+      if (url.includes('generativelanguage.googleapis.com')) {
+        return new Response(
+          JSON.stringify({
+            candidates: [
+              {
+                content: {
+                  parts: [
+                    {
+                      text: JSON.stringify([
+                        { i: 1, t: 'No manches, güey. [no manches: no way / kidding me]' }
+                      ])
+                    }
+                  ]
+                }
+              }
+            ]
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+      return new Response('[]', { status: 200 });
+    });
+
+    const cfg = encodeConfig({
+      languages: ['spa', 'eng'],
+      providers: ['wyzie'],
+      aiProvider: 'gemini',
+      aiApiKey: 'test-gemini-key',
+      aiMode: 'fallback',
+      proxySubtitles: true,
+      dualSubtitles: true,
+      dualSubtitlesNativeLang: 'eng',
+      dualSubtitlesAnnotate: true
+    });
+
+    const listRes = await request(app).get(`/${cfg}/subtitles/movie/tt0133093.json`);
+    expect(listRes.status).toBe(200);
+
+    const dualTrack = listRes.body.subtitles.find((s: { id: string }) =>
+      s.id.startsWith('dual-spa-eng-')
+    );
+    expect(dualTrack).toBeDefined();
+    expect(dualTrack.url).toContain('/dual/');
+
+    const dualToken = encodeDualToken({
+      primary: { u: 'https://example.com/sub-es.srt', f: 'srt' },
+      secondary: { u: 'https://example.com/sub-en.srt', f: 'srt' },
+      primaryLang: 'spa',
+      secondaryLang: 'eng',
+      annotate: true,
+      aiProvider: 'gemini',
+      aiApiKey: 'test-gemini-key'
+    });
+
+    const dualRes = await request(app).get(`/dual/${dualToken}.srt`);
+    expect(dualRes.status).toBe(200);
+    expect(dualRes.text).toContain('<b>No manches, güey. [no manches: no way / kidding me]</b>');
+    expect(dualRes.text).toContain('<font color="#999999">No way, dude.</font>');
   });
 });

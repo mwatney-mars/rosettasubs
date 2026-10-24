@@ -1,0 +1,29 @@
+export const LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" fill="none">
+  <defs>
+    <linearGradient id="bgGrad" x1="0" y1="0" x2="256" y2="256" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#121629" />
+      <stop offset="100%" stop-color="#07090f" />
+    </linearGradient>
+    <linearGradient id="accentGrad" x1="36" y1="32" x2="220" y2="224" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#7c5cff" />
+      <stop offset="100%" stop-color="#2dd4bf" />
+    </linearGradient>
+    <linearGradient id="subTopGrad" x1="68" y1="126" x2="188" y2="126" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#ffffff" />
+      <stop offset="100%" stop-color="#d8ceff" />
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="8" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+  <rect x="8" y="8" width="240" height="240" rx="56" fill="url(#bgGrad)" stroke="url(#accentGrad)" stroke-width="6" />
+  <path d="M56 96C56 60.6538 84.6538 32 120 32H136C171.346 32 200 60.6538 200 96V196C200 207.046 191.046 216 180 216H76C64.9543 216 56 207.046 56 196V96Z" fill="#0f1424" stroke="rgba(124,92,255,0.35)" stroke-width="3" />
+  <text x="86" y="102" fill="#f3f5fb" font-family="Inter, system-ui, -apple-system, sans-serif" font-weight="800" font-size="38" letter-spacing="-1">A</text>
+  <path d="M122 74L134 104" stroke="url(#accentGrad)" stroke-width="4" stroke-linecap="round" />
+  <text x="142" y="102" fill="#2dd4bf" font-family="Inter, system-ui, -apple-system, sans-serif" font-weight="800" font-size="34">文</text>
+  <rect x="74" y="132" width="108" height="14" rx="7" fill="url(#subTopGrad)" filter="url(#glow)" />
+  <rect x="86" y="156" width="84" height="11" rx="5.5" fill="#2dd4bf" fill-opacity="0.85" />
+  <rect x="96" y="178" width="64" height="8" rx="4" fill="#8590ad" fill-opacity="0.55" />
+  <path d="M196 44L200.5 56.5L213 61L200.5 65.5L196 78L191.5 65.5L179 61L191.5 56.5L196 44Z" fill="#2dd4bf" />
+</svg>`;

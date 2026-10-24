@@ -1,4 +1,4 @@
-import { AddonConfig, ProxyTokenPayload, TranslateTokenPayload } from './types';
+import { AddonConfig, DualTokenPayload, ProxyTokenPayload, TranslateTokenPayload } from './types';
 import { toIso639_2 } from './languages';
 
 export function getDefaultConfig(): AddonConfig {
@@ -21,7 +21,10 @@ export function getDefaultConfig(): AddonConfig {
     aiBaseUrl: process.env.AI_BASE_URL || undefined,
     aiMode: 'fallback',
     proxySubtitles: true,
-    includeHearingImpaired: true
+    includeHearingImpaired: true,
+    dualSubtitles: false,
+    dualSubtitlesNativeLang: 'eng',
+    dualSubtitlesAnnotate: false
   };
 }
 
@@ -71,7 +74,18 @@ export function decodeConfig(encoded?: string): AddonConfig {
       includeHearingImpaired:
         typeof parsed.includeHearingImpaired === 'boolean'
           ? parsed.includeHearingImpaired
-          : defaults.includeHearingImpaired
+          : defaults.includeHearingImpaired,
+      dualSubtitles:
+        typeof parsed.dualSubtitles === 'boolean'
+          ? parsed.dualSubtitles
+          : defaults.dualSubtitles,
+      dualSubtitlesNativeLang: parsed.dualSubtitlesNativeLang
+        ? toIso639_2(String(parsed.dualSubtitlesNativeLang))
+        : defaults.dualSubtitlesNativeLang,
+      dualSubtitlesAnnotate:
+        typeof parsed.dualSubtitlesAnnotate === 'boolean'
+          ? parsed.dualSubtitlesAnnotate
+          : defaults.dualSubtitlesAnnotate
     };
   } catch {
     return defaults;
@@ -106,4 +120,12 @@ export function encodeTranslateToken(payload: TranslateTokenPayload): string {
 
 export function decodeTranslateToken(token: string): TranslateTokenPayload | null {
   return decodeToken<TranslateTokenPayload>(token);
+}
+
+export function encodeDualToken(payload: DualTokenPayload): string {
+  return encodeToken(payload);
+}
+
+export function decodeDualToken(token: string): DualTokenPayload | null {
+  return decodeToken<DualTokenPayload>(token);
 }

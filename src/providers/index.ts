@@ -6,7 +6,7 @@ import {
   SubtitleQuery
 } from '../types';
 import { searchCache } from '../cache';
-import { encodeProxyToken, encodeTranslateToken } from '../config';
+import { encodeDualToken, encodeProxyToken, encodeTranslateToken } from '../config';
 import { searchWyzie } from './wyzie';
 import { searchOpenSubtitles } from './opensubtitles';
 import { searchSubdl } from './subdl';
@@ -119,26 +119,71 @@ export async function fetchRawSubtitles(
   return combined;
 }
 
+function toProxyPayload(
+  sub: RawSubtitleResult,
+  query: SubtitleQuery,
+  config: AddonConfig
+): ProxyTokenPayload {
+  return {
+    u: sub.downloadUrl,
+    f: sub.format,
+    e: sub.encoding,
+    osKey: sub.provider === 'opensubtitles' ? config.openSubtitlesApiKey : undefined,
+    se: query.season,
+    ep: query.episode
+  };
+}
+
+function selectBestCompanion(
+  primary: RawSubtitleResult,
+  candidates: RawSubtitleResult[]
+): RawSubtitleResult {
+  if (primary.hashMatch) {
+    const hashMatched = candidates.find((c) => c.hashMatch);
+    if (hashMatched) return hashMatched;
+  }
+  if (primary.releaseName) {
+    const normPrimary = primary.releaseName.trim().toLowerCase();
+    const releaseMatched = candidates.find(
+      (c) => c.releaseName && c.releaseName.trim().toLowerCase() === normPrimary
+    );
+    if (releaseMatched) return releaseMatched;
+  }
+  return candidates[0];
+}
+
 export async function getStremioSubtitles(
   query: SubtitleQuery,
   config: AddonConfig,
   baseUrl: string
 ): Promise<StremioSubtitle[]> {
-  const rawResults = await fetchRawSubtitles(query, config);
+  const nativeLang = config.dualSubtitlesNativeLang || 'eng';
+  const effectiveQuery: SubtitleQuery =
+    config.dualSubtitles && !query.languages.includes(nativeLang)
+      ? {
+          ...query,
+          languages: Array.from(new Set([...query.languages, nativeLang]))
+        }
+      : query;
+
+  const rawResults = await fetchRawSubtitles(effectiveQuery, config);
 
   const filtered = config.includeHearingImpaired
     ? rawResults
     : rawResults.filter((r) => !r.hearingImpaired);
 
   const requestedLangs = new Set(config.languages);
+  const groupingLangs = new Set(
+    config.dualSubtitles ? [...config.languages, nativeLang] : config.languages
+  );
   const byLang = new Map<string, RawSubtitleResult[]>();
 
   for (const sub of filtered) {
     let targetLang = sub.lang;
-    if (!requestedLangs.has(targetLang)) {
-      if (targetLang === 'por' && requestedLangs.has('pob')) {
+    if (!groupingLangs.has(targetLang)) {
+      if (targetLang === 'por' && groupingLangs.has('pob')) {
         targetLang = 'pob';
-      } else if (targetLang === 'pob' && requestedLangs.has('por')) {
+      } else if (targetLang === 'pob' && groupingLangs.has('por')) {
         targetLang = 'por';
       } else {
         continue;
@@ -151,6 +196,77 @@ export async function getStremioSubtitles(
 
   const cleanBaseUrl = baseUrl.replace(/\/+$/, '');
   const stremioSubs: StremioSubtitle[] = [];
+  const hasAiKey = Boolean(
+    config.aiApiKey ||
+      (config.aiProvider === 'openai'
+        ? process.env.OPENAI_API_KEY
+        : process.env.GEMINI_API_KEY)
+  );
+
+  if (config.dualSubtitles) {
+    const secondaryCandidates = byLang.get(nativeLang) || [];
+    for (const lang of config.languages) {
+      if (lang === nativeLang) continue;
+      const primaryCandidates = byLang.get(lang) || [];
+
+      if (primaryCandidates.length > 0 && secondaryCandidates.length > 0) {
+        const bestPrimary = primaryCandidates[0];
+        const bestSecondary = selectBestCompanion(bestPrimary, secondaryCandidates);
+        const dualToken = encodeDualToken({
+          primary: toProxyPayload(bestPrimary, query, config),
+          secondary: toProxyPayload(bestSecondary, query, config),
+          primaryLang: lang,
+          secondaryLang: nativeLang,
+          annotate: Boolean(config.dualSubtitlesAnnotate && hasAiKey),
+          aiProvider: config.aiProvider,
+          aiApiKey: config.aiApiKey,
+          aiModel: config.aiModel,
+          aiBaseUrl: config.aiBaseUrl
+        });
+        stremioSubs.push({
+          id: `dual-${lang}-${nativeLang}-${bestPrimary.id}`,
+          url: `${cleanBaseUrl}/dual/${dualToken}.srt`,
+          lang
+        });
+      } else if (config.aiMode !== 'off' && hasAiKey) {
+        if (primaryCandidates.length > 0 && secondaryCandidates.length === 0) {
+          const bestPrimary = primaryCandidates[0];
+          const dualToken = encodeDualToken({
+            primary: toProxyPayload(bestPrimary, query, config),
+            primaryLang: lang,
+            secondaryLang: nativeLang,
+            annotate: Boolean(config.dualSubtitlesAnnotate),
+            aiProvider: config.aiProvider,
+            aiApiKey: config.aiApiKey,
+            aiModel: config.aiModel,
+            aiBaseUrl: config.aiBaseUrl
+          });
+          stremioSubs.push({
+            id: `dual-ai-${lang}-${nativeLang}-${bestPrimary.id}`,
+            url: `${cleanBaseUrl}/dual/${dualToken}.srt`,
+            lang
+          });
+        } else if (primaryCandidates.length === 0 && secondaryCandidates.length > 0) {
+          const bestSecondary = secondaryCandidates[0];
+          const dualToken = encodeDualToken({
+            secondary: toProxyPayload(bestSecondary, query, config),
+            primaryLang: lang,
+            secondaryLang: nativeLang,
+            annotate: Boolean(config.dualSubtitlesAnnotate),
+            aiProvider: config.aiProvider,
+            aiApiKey: config.aiApiKey,
+            aiModel: config.aiModel,
+            aiBaseUrl: config.aiBaseUrl
+          });
+          stremioSubs.push({
+            id: `dual-ai-${lang}-${nativeLang}-${bestSecondary.id}`,
+            url: `${cleanBaseUrl}/dual/${dualToken}.srt`,
+            lang
+          });
+        }
+      }
+    }
+  }
 
   for (const lang of config.languages) {
     const matches = byLang.get(lang) || [];
@@ -163,14 +279,7 @@ export async function getStremioSubtitles(
 
       let url = sub.downloadUrl;
       if (needsProxy) {
-        const proxyPayload: ProxyTokenPayload = {
-          u: sub.downloadUrl,
-          f: sub.format,
-          e: sub.encoding,
-          osKey: sub.provider === 'opensubtitles' ? config.openSubtitlesApiKey : undefined,
-          se: query.season,
-          ep: query.episode
-        };
+        const proxyPayload = toProxyPayload(sub, query, config);
         url = `${cleanBaseUrl}/sub/${encodeProxyToken(proxyPayload)}.srt`;
       }
 
@@ -183,13 +292,6 @@ export async function getStremioSubtitles(
   }
 
   // AI Fallback / Multimodal Translation tracks
-  const hasAiKey = Boolean(
-    config.aiApiKey ||
-      (config.aiProvider === 'openai'
-        ? process.env.OPENAI_API_KEY
-        : process.env.GEMINI_API_KEY)
-  );
-
   if (config.aiMode !== 'off' && hasAiKey) {
     const langsNeedingAi = config.languages.filter((targetLang) => {
       const existingCount = (byLang.get(targetLang) || []).length;
@@ -212,15 +314,7 @@ export async function getStremioSubtitles(
 
       for (const targetLang of langsNeedingAi) {
         if (bestSource && bestSource.lang !== targetLang) {
-          const srcPayload: ProxyTokenPayload = {
-            u: bestSource.downloadUrl,
-            f: bestSource.format,
-            e: bestSource.encoding,
-            osKey:
-              bestSource.provider === 'opensubtitles' ? config.openSubtitlesApiKey : undefined,
-            se: query.season,
-            ep: query.episode
-          };
+          const srcPayload = toProxyPayload(bestSource, query, config);
 
           const translateToken = encodeTranslateToken({
             src: srcPayload,
