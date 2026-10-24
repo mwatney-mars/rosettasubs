@@ -12,7 +12,7 @@ export const LANGUAGES: LanguageEntry[] = [
   { iso639_2: 'ger', iso639_1: 'de', subdlCode: 'DE', name: 'German' },
   { iso639_2: 'ita', iso639_1: 'it', subdlCode: 'IT', name: 'Italian' },
   { iso639_2: 'por', iso639_1: 'pt', subdlCode: 'PT', name: 'Portuguese' },
-  { iso639_2: 'pob', iso639_1: 'pb', subdlCode: 'BR_PT', name: 'Portuguese (Brazil)' },
+  { iso639_2: 'pob', iso639_1: 'pt-br', subdlCode: 'BR_PT', name: 'Portuguese (Brazil)' },
   { iso639_2: 'rus', iso639_1: 'ru', subdlCode: 'RU', name: 'Russian' },
   { iso639_2: 'jpn', iso639_1: 'ja', subdlCode: 'JA', name: 'Japanese' },
   { iso639_2: 'kor', iso639_1: 'ko', subdlCode: 'KO', name: 'Korean' },
@@ -44,11 +44,13 @@ export const LANGUAGES: LanguageEntry[] = [
 
 const BY_ISO2 = new Map<string, LanguageEntry>();
 const BY_ISO1 = new Map<string, LanguageEntry>();
+const BY_SUBDL = new Map<string, LanguageEntry>();
 const BY_NAME = new Map<string, LanguageEntry>();
 
 for (const entry of LANGUAGES) {
   BY_ISO2.set(entry.iso639_2.toLowerCase(), entry);
   BY_ISO1.set(entry.iso639_1.toLowerCase(), entry);
+  BY_SUBDL.set(entry.subdlCode.toLowerCase(), entry);
   BY_NAME.set(entry.name.toLowerCase(), entry);
 }
 
@@ -68,9 +70,16 @@ const ISO2_ALIASES: Record<string, string> = {
   rum: 'ron',
   slk: 'slk',
   slo: 'slk',
-   'pt-br': 'pob',
+  'pt-br': 'pob',
   'pt_br': 'pob',
+  br_pt: 'pob',
   pb: 'pob',
+  'brazilian portuguese': 'pob',
+  'brazillian portuguese': 'pob',
+  'portuguese (brazil)': 'pob',
+  'portuguese-br': 'pob',
+  'pt-pt': 'por',
+  'pt_pt': 'por',
   'zh-cn': 'zho',
   'zh-tw': 'zho',
   'es-la': 'spa',
@@ -86,6 +95,8 @@ export function toIso639_2(codeOrName: string): string {
   if (by2) return by2.iso639_2;
   const by1 = BY_ISO1.get(clean);
   if (by1) return by1.iso639_2;
+  const bySubdl = BY_SUBDL.get(clean);
+  if (bySubdl) return bySubdl.iso639_2;
   if (clean.includes('-')) {
     const base = clean.split('-')[0];
     const byBase = BY_ISO1.get(base);

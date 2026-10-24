@@ -39,6 +39,10 @@ export async function searchOpenSubtitles(
   if (Number.isNaN(numericImdb)) return [];
 
   const iso1Langs = new Set(query.languages.map((l) => toIso639_1(l)));
+  if (query.languages.includes('pob') || query.languages.includes('por')) {
+    iso1Langs.add('pt-br');
+    iso1Langs.add('pt-pt');
+  }
   iso1Langs.add('en'); // Always include English as potential AI translation source
 
   const params = new URLSearchParams({

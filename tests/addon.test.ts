@@ -45,6 +45,9 @@ describe('Language Utilities', () => {
     expect(toIso639_2('en')).toBe('eng');
     expect(toIso639_2('es')).toBe('spa');
     expect(toIso639_2('pt-BR')).toBe('pob');
+    expect(toIso639_2('Brazillian Portuguese')).toBe('pob');
+    expect(toIso639_2('BR_PT')).toBe('pob');
+    expect(toIso639_1('pob')).toBe('pt-br');
     expect(toIso639_2('French')).toBe('fre');
     expect(toIso639_1('spa')).toBe('es');
     expect(toSubdlCode('pob')).toBe('BR_PT');

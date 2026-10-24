@@ -28,6 +28,10 @@ export async function searchSubdl(
   if (!apiKey || !query.imdbId) return [];
 
   const subdlLangs = new Set(query.languages.map((l) => toSubdlCode(l)));
+  if (query.languages.includes('pob') || query.languages.includes('por')) {
+    subdlLangs.add('BR_PT');
+    subdlLangs.add('PT');
+  }
   subdlLangs.add('EN');
 
   const params = new URLSearchParams({

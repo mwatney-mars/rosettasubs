@@ -134,10 +134,19 @@ export async function getStremioSubtitles(
   const byLang = new Map<string, RawSubtitleResult[]>();
 
   for (const sub of filtered) {
-    if (!requestedLangs.has(sub.lang)) continue;
-    const list = byLang.get(sub.lang) || [];
-    list.push(sub);
-    byLang.set(sub.lang, list);
+    let targetLang = sub.lang;
+    if (!requestedLangs.has(targetLang)) {
+      if (targetLang === 'por' && requestedLangs.has('pob')) {
+        targetLang = 'pob';
+      } else if (targetLang === 'pob' && requestedLangs.has('por')) {
+        targetLang = 'por';
+      } else {
+        continue;
+      }
+    }
+    const list = byLang.get(targetLang) || [];
+    list.push({ ...sub, lang: targetLang });
+    byLang.set(targetLang, list);
   }
 
   const cleanBaseUrl = baseUrl.replace(/\/+$/, '');

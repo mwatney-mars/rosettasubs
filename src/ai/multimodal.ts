@@ -31,19 +31,24 @@ interface CueBatchItem {
 async function callGeminiJson(
   prompt: string,
   apiKey: string,
-  model = 'gemini-2.5-flash',
+  model = 'gemini-2.0-flash',
   baseUrl = 'https://generativelanguage.googleapis.com/v1beta'
 ): Promise<string> {
   const url = `${baseUrl.replace(/\/+$/, '')}/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
+  const generationConfig: Record<string, unknown> = {
+    temperature: 0.1,
+    responseMimeType: 'application/json'
+  };
+  if (model.includes('2.5')) {
+    generationConfig.thinkingConfig = { thinkingBudget: 0 };
+  }
+
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      generationConfig: {
-        temperature: 0.2,
-        responseMimeType: 'application/json'
-      }
+      generationConfig
     })
   });
 
@@ -150,7 +155,7 @@ async function translateBatch(
       : await callGeminiJson(
           prompt,
           apiKey,
-          options.model || 'gemini-2.5-flash',
+          options.model || 'gemini-2.0-flash',
           options.baseUrl || 'https://generativelanguage.googleapis.com/v1beta'
         );
 
@@ -170,7 +175,7 @@ export async function translateSrtContent(options: TranslateOptions): Promise<st
 
   const fromName = getLanguageName(options.fromLang);
   const toName = getLanguageName(options.toLang);
-  const batchSize = options.batchSize ?? 60;
+  const batchSize = options.batchSize ?? 250;
 
   const batches: SrtCue[][] = [];
   for (let i = 0; i < cues.length; i += batchSize) {
@@ -178,7 +183,7 @@ export async function translateSrtContent(options: TranslateOptions): Promise<st
   }
 
   const translatedMap = new Map<number, string>();
-  const concurrency = 3;
+  const concurrency = 8;
 
   for (let i = 0; i < batches.length; i += concurrency) {
     const slice = batches.slice(i, i + concurrency);
