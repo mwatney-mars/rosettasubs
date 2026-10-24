@@ -59,20 +59,23 @@ async function callGeminiJson(
   model = 'gemini-2.0-flash',
   baseUrl?: string
 ): Promise<string> {
-  const candidateBaseUrls = baseUrl
-    ? [baseUrl]
+  const candidateEndpoints = baseUrl
+    ? [{ url: baseUrl, model }]
     : apiKey.startsWith('AQ.')
       ? [
-          'https://aiplatform.googleapis.com/v1/publishers/google',
-          'https://generativelanguage.googleapis.com/v1beta'
+          {
+            url: 'https://aiplatform.googleapis.com/v1/publishers/google',
+            model: model === 'gemini-2.0-flash' ? 'gemini-2.5-flash' : model
+          },
+          { url: 'https://generativelanguage.googleapis.com/v1beta', model }
         ]
-      : ['https://generativelanguage.googleapis.com/v1beta'];
+      : [{ url: 'https://generativelanguage.googleapis.com/v1beta', model }];
 
   let lastStatus = 500;
   let lastErrText = '';
 
-  for (const candidateUrl of candidateBaseUrls) {
-    const res = await callGeminiEndpoint(prompt, apiKey, model, candidateUrl);
+  for (const candidate of candidateEndpoints) {
+    const res = await callGeminiEndpoint(prompt, apiKey, candidate.model, candidate.url);
     if (res.ok) {
       const data = (await res.json()) as {
         candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
