@@ -15,6 +15,10 @@ export interface StremioManifest {
     configurable: boolean;
     configurationRequired: boolean;
   };
+  stremioAddonsConfig: {
+    issuer: string;
+    signature: string;
+  };
 }
 
 export function buildManifest(config: AddonConfig, isConfigured = false): StremioManifest {
@@ -37,6 +41,11 @@ export function buildManifest(config: AddonConfig, isConfigured = false): Stremi
     behaviorHints: {
       configurable: true,
       configurationRequired: false
+    },
+    stremioAddonsConfig: {
+      issuer: 'https://stremio-addons.net',
+      signature:
+        'eyJhbGciOiJkaXIiLCJlbmMiOiJBMTI4Q0JDLUhTMjU2In0..c1EvV0j__vjhcVCfSbF67A.NfDS5NmCGwYra8f-DwjUcRFZozVFZko0n7xjWRM9DWT9k4jliP6nSwBsKZ8UNv4FwbIJyFliAnOuOIYuEkiFP5pxvOnaxMIKtiENKW_P9DfTyWrMpVLoBw1QBBqwjVD7.4aj1-S1kTkO70CFR3sVYfw'
     }
   };
 }
