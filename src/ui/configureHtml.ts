@@ -5,7 +5,7 @@ export function renderConfigurePage(config: AddonConfig, baseUrl: string): strin
   const initialConfigJson = JSON.stringify(config).replace(/</g, '\\u003c');
   const languagesJson = JSON.stringify(LANGUAGES).replace(/</g, '\\u003c');
   const supportUrl =
-    process.env.SUPPORT_URL || 'https://buymeacoffee.com/mwatney';
+    process.env.SUPPORT_URL || 'https://github.com/sponsors/mwatney-mars';
 
   return `<!DOCTYPE html>
 <html lang="en">
