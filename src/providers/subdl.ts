@@ -80,7 +80,7 @@ export async function searchSubdl(
         : `${SUBDL_DL_BASE}${sub.url.startsWith('/') ? '' : '/'}${sub.url}`;
 
       const releaseName = sub.release_name || sub.name;
-      let score = 75 - Math.min(i, 30);
+      let score = 82 - Math.min(i, 30);
       if (
         query.filename &&
         releaseName &&

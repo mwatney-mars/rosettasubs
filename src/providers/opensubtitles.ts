@@ -105,7 +105,7 @@ export async function searchOpenSubtitles(
       const hashMatch = Boolean(attrs.moviehash_match);
       const releaseName = attrs.release || file.file_name;
 
-      let score = 80 - Math.min(i, 30);
+      let score = 68 - Math.min(i, 30);
       if (hashMatch) score += 50;
       if (
         query.filename &&

@@ -71,6 +71,8 @@ export interface ProxyTokenPayload {
   f?: 'srt' | 'vtt' | 'ass' | 'sub' | 'zip';
   e?: string; // encoding hint
   osKey?: string; // OpenSubtitles API key if needed for lazy download
+  fb?: string; // fallback direct URL if os:// quota is exhausted
+  fbf?: 'srt' | 'vtt' | 'ass' | 'sub' | 'zip'; // fallback format hint
   ep?: number; // episode number hint for zip extraction
   se?: number; // season number hint for zip extraction
 }

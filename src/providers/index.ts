@@ -122,13 +122,17 @@ export async function fetchRawSubtitles(
 function toProxyPayload(
   sub: RawSubtitleResult,
   query: SubtitleQuery,
-  config: AddonConfig
+  config: AddonConfig,
+  fallbackSub?: RawSubtitleResult
 ): ProxyTokenPayload {
+  const isOs = sub.downloadUrl.startsWith('os://');
   return {
     u: sub.downloadUrl,
     f: sub.format,
     e: sub.encoding,
     osKey: sub.provider === 'opensubtitles' ? config.openSubtitlesApiKey : undefined,
+    fb: isOs && fallbackSub ? fallbackSub.downloadUrl : undefined,
+    fbf: isOs && fallbackSub ? fallbackSub.format : undefined,
     se: query.season,
     ep: query.episode
   };
@@ -270,6 +274,8 @@ export async function getStremioSubtitles(
 
   for (const lang of config.languages) {
     const matches = byLang.get(lang) || [];
+    const directFallbacks = matches.filter((m) => !m.downloadUrl.startsWith('os://'));
+    let fbIdx = 0;
     for (const sub of matches.slice(0, 15)) {
       const needsProxy =
         config.proxySubtitles ||
@@ -279,7 +285,11 @@ export async function getStremioSubtitles(
 
       let url = sub.downloadUrl;
       if (needsProxy) {
-        const proxyPayload = toProxyPayload(sub, query, config);
+        const fallbackSub =
+          sub.downloadUrl.startsWith('os://') && directFallbacks.length > 0
+            ? directFallbacks[fbIdx++ % directFallbacks.length]
+            : undefined;
+        const proxyPayload = toProxyPayload(sub, query, config, fallbackSub);
         url = `${cleanBaseUrl}/sub/${encodeProxyToken(proxyPayload)}.srt`;
       }
 

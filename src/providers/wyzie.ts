@@ -70,7 +70,7 @@ async function searchStremioOsV3(
       const iso1 = toIso639_1(lang);
       const hashMatch = item.m === 'h';
       const releaseName = item.movieReleaseName || item.subtitleFileName;
-      let score = 75 - Math.min(i, 30);
+      let score = 85 - Math.min(i, 30);
       if (hashMatch) score += 50;
 
       results.push({

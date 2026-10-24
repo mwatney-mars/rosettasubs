@@ -17,13 +17,18 @@ export async function fetchAndNormalizeSubtitle(
   if (cached) return cached;
 
   let targetUrl = payload.u;
+  let formatHint: string | undefined = payload.f;
   if (targetUrl.startsWith('os://')) {
     const fileId = targetUrl.replace(/^os:\/\//, '');
     const resolved = await resolveOpenSubtitlesDownloadUrl(fileId, payload.osKey, timeoutMs);
-    if (!resolved) {
+    if (resolved) {
+      targetUrl = resolved;
+    } else if (payload.fb) {
+      targetUrl = payload.fb;
+      formatHint = payload.fbf || 'srt';
+    } else {
       throw new Error(`Failed to resolve OpenSubtitles download link for file ${fileId}`);
     }
-    targetUrl = resolved;
   }
 
   const parsedUrl = new URL(targetUrl);
@@ -49,9 +54,8 @@ export async function fetchAndNormalizeSubtitle(
 
     const arrayBuf = await res.arrayBuffer();
     let buffer: Buffer = Buffer.from(arrayBuf);
-    let formatHint: string | undefined = payload.f;
 
-    if (payload.f === 'zip' || isZipBuffer(buffer)) {
+    if (formatHint === 'zip' || isZipBuffer(buffer)) {
       const extracted = extractSubtitleFromZip(buffer, payload.se, payload.ep);
       if (!extracted) {
         throw new Error('No valid subtitle file found inside ZIP archive');
