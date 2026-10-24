@@ -184,3 +184,34 @@ export function scoreReleaseMatch(
 
   return delta;
 }
+
+export function summarizeRelease(releaseName?: string): string | undefined {
+  if (!releaseName) return undefined;
+  const trimmed = releaseName.trim();
+  if (!trimmed || /^OSv3\s*#\d+$/i.test(trimmed)) return undefined;
+
+  const res = extractResolution(trimmed);
+  let sourceTag: string | undefined;
+  if (/\bweb[-_.]?dl\b/i.test(trimmed)) {
+    sourceTag = 'WEB-DL';
+  } else if (/\bwebrip\b/i.test(trimmed)) {
+    sourceTag = 'WEBRip';
+  } else {
+    const family = detectSourceFamily(trimmed);
+    if (family === 'web') sourceTag = 'WEB';
+    else if (family === 'bluray') sourceTag = 'BluRay';
+    else if (family === 'hdtv') sourceTag = 'HDTV';
+    else if (family === 'dvd') sourceTag = 'DVDRip';
+    else if (family === 'screener') sourceTag = 'CAM/SCR';
+  }
+
+  const group = extractReleaseGroup(trimmed)?.toUpperCase();
+  const base = [res, sourceTag].filter(Boolean).join(' ');
+  if (base && group) return `${base}-${group}`;
+  if (base) return base;
+  if (group) return group;
+
+  const cleaned = stripMediaExtension(trimmed).replace(/[._]+/g, ' ').trim();
+  if (!cleaned) return undefined;
+  return cleaned.length > 24 ? `${cleaned.slice(0, 22).trim()}…` : cleaned;
+}

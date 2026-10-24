@@ -10,6 +10,56 @@ import { encodeDualToken, encodeProxyToken, encodeTranslateToken } from '../conf
 import { searchWyzie } from './wyzie';
 import { searchOpenSubtitles } from './opensubtitles';
 import { searchSubdl } from './subdl';
+import { summarizeRelease } from './releaseScorer';
+
+const LANG_SHORT_LABELS: Record<string, string> = {
+  pob: 'PT-BR',
+  por: 'PT-PT',
+  eng: 'EN',
+  spa: 'ES',
+  fre: 'FR',
+  ger: 'DE',
+  ita: 'IT',
+  jpn: 'JA',
+  kor: 'KO',
+  chi: 'ZH',
+  rus: 'RU',
+  ara: 'AR',
+  hin: 'HI',
+  tur: 'TR',
+  pol: 'PL',
+  dut: 'NL',
+  swe: 'SV',
+  nor: 'NO',
+  dan: 'DA',
+  fin: 'FI'
+};
+
+function formatLangShort(code: string): string {
+  return LANG_SHORT_LABELS[code.toLowerCase()] || code.toUpperCase();
+}
+
+function formatProviderTag(sub: RawSubtitleResult): string {
+  if (sub.id.startsWith('osv3-')) return 'OSv3';
+  if (sub.provider === 'subdl') return 'SubDL';
+  if (sub.provider === 'opensubtitles') return 'OpenSub';
+  if (sub.provider === 'wyzie') return 'Wyzie';
+  return 'AI';
+}
+
+export function formatSubtitleLabel(sub: RawSubtitleResult, rank: number): string {
+  const langTag = formatLangShort(sub.originalLang || sub.lang);
+  const providerTag = formatProviderTag(sub);
+  const relSummary = summarizeRelease(sub.releaseName);
+  const flags: string[] = [];
+  if (sub.hashMatch) flags.push('★Hash');
+  if (sub.hearingImpaired) flags.push('HI');
+
+  const parts = [`${langTag} #${rank}`, providerTag];
+  if (relSummary) parts.push(relSummary);
+  if (flags.length > 0) parts.push(flags.join(' '));
+  return parts.join(' • ');
+}
 
 export function parseStremioSubtitleRequest(
   type: string,
@@ -171,8 +221,10 @@ function selectBestCompanion(
 export async function getStremioSubtitles(
   query: SubtitleQuery,
   config: AddonConfig,
-  baseUrl: string
+  baseUrl: string,
+  options?: { descriptiveLang?: boolean }
 ): Promise<StremioSubtitle[]> {
+  const descriptiveLang = Boolean(options?.descriptiveLang);
   const nativeLang = config.dualSubtitlesNativeLang || 'eng';
   const effectiveQuery: SubtitleQuery =
     config.dualSubtitles && !query.languages.includes(nativeLang)
@@ -209,7 +261,12 @@ export async function getStremioSubtitles(
       }
     }
     const list = byLang.get(targetLang) || [];
-    list.push({ ...sub, lang: targetLang, score: sub.score - langPenalty });
+    list.push({
+      ...sub,
+      originalLang: sub.originalLang || sub.lang,
+      lang: targetLang,
+      score: sub.score - langPenalty
+    });
     byLang.set(targetLang, list);
   }
 
@@ -225,6 +282,7 @@ export async function getStremioSubtitles(
         ? process.env.OPENAI_API_KEY
         : process.env.GEMINI_API_KEY)
   );
+  const aiDisplayName = config.aiProvider === 'openai' ? 'OpenAI' : 'Gemini';
 
   if (config.dualSubtitles) {
     const secondaryCandidates = byLang.get(nativeLang) || [];
@@ -258,10 +316,19 @@ export async function getStremioSubtitles(
           aiModel: config.aiModel,
           aiBaseUrl: config.aiBaseUrl
         });
+        const relSummary = summarizeRelease(bestPrimary.releaseName);
+        const label = [
+          `${formatLangShort(lang)}+${formatLangShort(nativeLang)}`,
+          'Dual',
+          relSummary
+        ]
+          .filter(Boolean)
+          .join(' • ');
         stremioSubs.push({
           id: `dual-${lang}-${nativeLang}-${bestPrimary.id}`,
           url: `${cleanBaseUrl}/dual/${dualToken}.srt`,
-          lang
+          lang: descriptiveLang ? label : lang,
+          label
         });
       } else if (config.aiMode !== 'off' && hasAiKey) {
         if (primaryCandidates.length > 0 && secondaryCandidates.length === 0) {
@@ -281,10 +348,12 @@ export async function getStremioSubtitles(
             aiModel: config.aiModel,
             aiBaseUrl: config.aiBaseUrl
           });
+          const label = `${formatLangShort(lang)}+${formatLangShort(nativeLang)} • Dual + AI (${aiDisplayName})`;
           stremioSubs.push({
             id: `dual-ai-${lang}-${nativeLang}-${bestPrimary.id}`,
             url: `${cleanBaseUrl}/dual/${dualToken}.srt`,
-            lang
+            lang: descriptiveLang ? label : lang,
+            label
           });
         } else if (primaryCandidates.length === 0 && secondaryCandidates.length > 0) {
           const bestSecondary = secondaryCandidates[0];
@@ -303,10 +372,12 @@ export async function getStremioSubtitles(
             aiModel: config.aiModel,
             aiBaseUrl: config.aiBaseUrl
           });
+          const label = `${formatLangShort(lang)}+${formatLangShort(nativeLang)} • Dual + AI (${aiDisplayName})`;
           stremioSubs.push({
             id: `dual-ai-${lang}-${nativeLang}-${bestSecondary.id}`,
             url: `${cleanBaseUrl}/dual/${dualToken}.srt`,
-            lang
+            lang: descriptiveLang ? label : lang,
+            label
           });
         }
       }
@@ -321,7 +392,9 @@ export async function getStremioSubtitles(
         ? allMatches.filter((m) => !m.downloadUrl.startsWith('os://') || m.hashMatch)
         : allMatches;
     let fbIdx = 0;
-    for (const sub of matches.slice(0, 15)) {
+    const topMatches = matches.slice(0, 15);
+    for (let idx = 0; idx < topMatches.length; idx++) {
+      const sub = topMatches[idx];
       const needsProxy =
         config.proxySubtitles ||
         sub.downloadUrl.startsWith('os://') ||
@@ -335,10 +408,22 @@ export async function getStremioSubtitles(
         url = `${cleanBaseUrl}/sub/${encodeProxyToken(proxyPayload)}.srt`;
       }
 
+      const label = formatSubtitleLabel(sub, idx + 1);
+      if (descriptiveLang && idx === 0) {
+        // Emit standard ISO 639-2 entry first so TV/native players auto-select preferred language
+        stremioSubs.push({
+          id: `${sub.id}-auto`,
+          url,
+          lang: sub.lang,
+          label
+        });
+      }
+
       stremioSubs.push({
         id: sub.id,
         url,
-        lang: sub.lang
+        lang: descriptiveLang ? label : sub.lang,
+        label
       });
     }
   }
@@ -386,10 +471,32 @@ export async function getStremioSubtitles(
             aiBaseUrl: config.aiBaseUrl
           });
 
+          const srcSummary = summarizeRelease(bestSource.releaseName);
+          const label = [
+            formatLangShort(targetLang),
+            `AI (${aiDisplayName})`,
+            `${formatLangShort(bestSource.lang)}→${formatLangShort(targetLang)}`,
+            srcSummary
+          ]
+            .filter(Boolean)
+            .join(' • ');
+          const url = `${cleanBaseUrl}/translate/${translateToken}.srt`;
+          const aiId = `ai-${config.aiProvider}-${targetLang}-${bestSource.id}`;
+
+          if (descriptiveLang && (byLang.get(targetLang) || []).length === 0) {
+            stremioSubs.push({
+              id: `${aiId}-auto`,
+              url,
+              lang: targetLang,
+              label
+            });
+          }
+
           stremioSubs.push({
-            id: `ai-${config.aiProvider}-${targetLang}-${bestSource.id}`,
-            url: `${cleanBaseUrl}/translate/${translateToken}.srt`,
-            lang: targetLang
+            id: aiId,
+            url,
+            lang: descriptiveLang ? label : targetLang,
+            label
           });
         }
       }

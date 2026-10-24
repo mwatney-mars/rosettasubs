@@ -299,9 +299,22 @@ describe('Express Stremio Add-on Routes & Multimodal AI Flow', () => {
 
     expect(engSub).toBeDefined();
     expect(engSub.url).toContain('/sub/');
+    expect(engSub.label).toContain('EN #1 • Wyzie');
     expect(jpnAiSub).toBeDefined();
     expect(jpnAiSub.id).toContain('ai-gemini-jpn');
     expect(jpnAiSub.url).toContain('/translate/');
+    expect(jpnAiSub.label).toContain('JA • AI (Gemini) • EN→JA');
+
+    const tvRes = await request(app).get(
+      `/${cfg}/subtitles/movie/tt0133093.json?descriptiveLang=1`
+    );
+    expect(tvRes.status).toBe(200);
+    expect(tvRes.body.subtitles.some((s: { lang: string }) => s.lang.includes('EN #1 • Wyzie'))).toBe(
+      true
+    );
+    expect(
+      tvRes.body.subtitles.some((s: { lang: string }) => s.lang.includes('AI (Gemini)'))
+    ).toBe(true);
   });
 
   it('proxies and normalizes upstream VTT subtitles to UTF-8 SRT via /sub/:token.srt', async () => {

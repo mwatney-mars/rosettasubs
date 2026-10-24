@@ -25,6 +25,7 @@ export interface StremioSubtitle {
   id: string;
   url: string;
   lang: string;
+  label?: string;
 }
 
 export interface StremioSubtitlesResponse {
@@ -50,6 +51,7 @@ export interface RawSubtitleResult {
   provider: ProviderName | 'ai';
   downloadUrl: string; // HTTP(S) URL or internal scheme like os://<file_id>:<api_key_hash>
   lang: string; // ISO 639-2 code for Stremio
+  originalLang?: string; // Original ISO 639-2 code before por<->pob fallback grouping
   iso639_1: string; // ISO 639-1 code
   format: 'srt' | 'vtt' | 'ass' | 'sub' | 'zip';
   encoding?: string;

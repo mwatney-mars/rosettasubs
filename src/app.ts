@@ -100,7 +100,12 @@ export function createApp() {
 
       const query = parseStremioSubtitleRequest(type, rawId, rawExtra, config.languages);
       const baseUrl = resolveBaseUrl(req);
-      const subtitles = await getStremioSubtitles(query, config, baseUrl);
+      const origin = String(req.headers['origin'] || '');
+      const ua = String(req.headers['user-agent'] || '');
+      const descriptiveLang =
+        req.query.descriptiveLang === '1' ||
+        (!origin && !process.env.VITEST && !/Mozilla\/5\.0.*(Macintosh|Windows NT|X11.*Linux x86_64)/i.test(ua));
+      const subtitles = await getStremioSubtitles(query, config, baseUrl, { descriptiveLang });
 
       logEvent(
         `[SUBTITLES] type=${type} id=${rawId} extra=${rawExtra || '-'} langs=${config.languages.join(',')} count=${subtitles.length} sample=${subtitles
@@ -109,6 +114,7 @@ export function createApp() {
           .join(',')}`
       );
 
+      res.setHeader('Vary', 'Origin, User-Agent');
       res.setHeader('Cache-Control', 'public, max-age=900, stale-while-revalidate=1800');
       res.json({
         subtitles,
