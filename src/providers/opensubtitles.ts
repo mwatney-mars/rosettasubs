@@ -1,5 +1,6 @@
 import { RawSubtitleResult, SubtitleQuery } from '../types';
 import { toIso639_1, toIso639_2 } from '../languages';
+import { scoreReleaseMatch } from './releaseScorer';
 
 interface OpenSubtitlesFile {
   file_id?: number;
@@ -90,6 +91,7 @@ export async function searchOpenSubtitles(
     if (!Array.isArray(json.data)) return [];
 
     const results: RawSubtitleResult[] = [];
+    const langCounts = new Map<string, number>();
     for (let i = 0; i < json.data.length; i++) {
       const item = json.data[i];
       const attrs = item.attributes;
@@ -102,18 +104,15 @@ export async function searchOpenSubtitles(
 
       const lang = toIso639_2(attrs.language);
       const iso1 = toIso639_1(lang);
+      const langIdx = langCounts.get(lang) || 0;
+      langCounts.set(lang, langIdx + 1);
+
       const hashMatch = Boolean(attrs.moviehash_match);
       const releaseName = attrs.release || file.file_name;
 
-      let score = 68 - Math.min(i, 30);
+      let score = 68 - Math.min(langIdx, 30);
       if (hashMatch) score += 50;
-      if (
-        query.filename &&
-        releaseName &&
-        query.filename.toLowerCase().includes(releaseName.toLowerCase())
-      ) {
-        score += 20;
-      }
+      score += scoreReleaseMatch(query.filename, releaseName);
 
       results.push({
         id: `os-${file.file_id}-${lang}`,

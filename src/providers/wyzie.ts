@@ -1,5 +1,6 @@
 import { RawSubtitleResult, SubtitleQuery } from '../types';
 import { toIso639_1, toIso639_2 } from '../languages';
+import { scoreReleaseMatch } from './releaseScorer';
 
 interface WyzieSubItem {
   id?: string;
@@ -20,6 +21,7 @@ interface StremioOsV3Item {
   m?: string;
   movieReleaseName?: string;
   subtitleFileName?: string;
+  releaseFormat?: string;
 }
 
 const WYZIE_BASE_URL = process.env.WYZIE_API_URL || 'https://sub.wyzie.ru';
@@ -62,16 +64,21 @@ async function searchStremioOsV3(
     if (!Array.isArray(json.subtitles)) return [];
 
     const results: RawSubtitleResult[] = [];
+    const langCounts = new Map<string, number>();
     for (let i = 0; i < json.subtitles.length; i++) {
       const item = json.subtitles[i];
       if (!item.url || !item.lang) continue;
 
       const lang = toIso639_2(item.lang);
       const iso1 = toIso639_1(lang);
+      const langIdx = langCounts.get(lang) || 0;
+      langCounts.set(lang, langIdx + 1);
+
       const hashMatch = item.m === 'h';
       const releaseName = item.movieReleaseName || item.subtitleFileName;
-      let score = 85 - Math.min(i, 30);
+      let score = 85 - Math.min(langIdx, 30);
       if (hashMatch) score += 50;
+      score += scoreReleaseMatch(query.filename, releaseName, item.releaseFormat);
 
       results.push({
         id: `osv3-${item.id || i}-${lang}`,
@@ -126,25 +133,23 @@ export async function searchWyzie(
       const data = (await res.json()) as WyzieSubItem[];
       if (Array.isArray(data) && data.length > 0) {
         const results: RawSubtitleResult[] = [];
+        const langCounts = new Map<string, number>();
         for (let i = 0; i < data.length; i++) {
           const item = data[i];
           if (!item.url || !item.language) continue;
 
           const lang = toIso639_2(item.language);
           const iso1 = toIso639_1(lang);
+          const langIdx = langCounts.get(lang) || 0;
+          langCounts.set(lang, langIdx + 1);
+
           const fmtRaw = (item.format || 'srt').toLowerCase();
           const format =
             fmtRaw === 'vtt' || fmtRaw === 'ass' || fmtRaw === 'sub' ? fmtRaw : 'srt';
 
           const releaseName = item.release || item.media || undefined;
-          let score = 70 - Math.min(i, 30);
-          if (
-            query.filename &&
-            releaseName &&
-            query.filename.toLowerCase().includes(releaseName.toLowerCase())
-          ) {
-            score += 20;
-          }
+          let score = 70 - Math.min(langIdx, 30);
+          score += scoreReleaseMatch(query.filename, releaseName);
 
           results.push({
             id: `wyzie-${item.id || i}-${lang}`,

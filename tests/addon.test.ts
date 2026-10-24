@@ -23,6 +23,7 @@ import {
   vttToSrt
 } from '../src/subtitleConverter';
 import { parseStremioSubtitleRequest } from '../src/providers';
+import { scoreReleaseMatch } from '../src/providers/releaseScorer';
 
 function createMockZip(filename: string, content: string): Buffer {
   const fileData = Buffer.from(content, 'utf8');
@@ -43,6 +44,13 @@ function createMockZip(filename: string, content: string): Buffer {
 }
 
 describe('Language Utilities', () => {
+  it('scores release similarity by source family, release group, and penalizes screeners', () => {
+    const webFile = 'Breathe 2017 1080p AMZN WEB-DL DDP5 1 H 264 DUAL-BiOMA.mkv';
+    expect(scoreReleaseMatch(webFile, 'Breathe.2017.1080p.WEB-DL.x264-BiOMA', 'WEB-DL')).toBeGreaterThan(40);
+    expect(scoreReleaseMatch(webFile, 'Breathe.2017.1080p.BluRay.x264-DRONES', 'BluRay')).toBeLessThan(0);
+    expect(scoreReleaseMatch('Lone Survivor (2013).mkv', 'Lone.Survivor.2013.DVDSCR.XVID-Snake1')).toBeLessThan(-20);
+  });
+
   it('maps between ISO 639-1, ISO 639-2, and SubDL codes', () => {
     expect(toIso639_2('en')).toBe('eng');
     expect(toIso639_2('es')).toBe('spa');

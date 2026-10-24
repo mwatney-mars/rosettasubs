@@ -1,5 +1,6 @@
 import { RawSubtitleResult, SubtitleQuery } from '../types';
 import { toIso639_1, toIso639_2, toSubdlCode } from '../languages';
+import { scoreReleaseMatch } from './releaseScorer';
 
 interface SubdlSubtitleItem {
   release_name?: string;
@@ -68,6 +69,7 @@ export async function searchSubdl(
     if (!json.status || !Array.isArray(json.subtitles)) return [];
 
     const results: RawSubtitleResult[] = [];
+    const langCounts = new Map<string, number>();
     for (let i = 0; i < json.subtitles.length; i++) {
       const sub = json.subtitles[i];
       if (!sub.url) continue;
@@ -78,19 +80,16 @@ export async function searchSubdl(
       const rawLang = sub.language || sub.lang || 'english';
       const lang = toIso639_2(rawLang);
       const iso1 = toIso639_1(lang);
+      const langIdx = langCounts.get(lang) || 0;
+      langCounts.set(lang, langIdx + 1);
+
       const downloadUrl = cleanUrlPath.startsWith('http')
         ? cleanUrlPath
         : `${SUBDL_DL_BASE}${cleanUrlPath.startsWith('/') ? '' : '/'}${cleanUrlPath}`;
 
       const releaseName = sub.release_name || sub.name;
-      let score = 82 - Math.min(i, 30);
-      if (
-        query.filename &&
-        releaseName &&
-        query.filename.toLowerCase().includes(releaseName.toLowerCase())
-      ) {
-        score += 20;
-      }
+      let score = 82 - Math.min(langIdx, 30);
+      score += scoreReleaseMatch(query.filename, releaseName);
 
       results.push({
         id: `subdl-${i}-${lang}`,

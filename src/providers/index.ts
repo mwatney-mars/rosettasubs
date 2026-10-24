@@ -196,18 +196,25 @@ export async function getStremioSubtitles(
 
   for (const sub of filtered) {
     let targetLang = sub.lang;
+    let langPenalty = 0;
     if (!groupingLangs.has(targetLang)) {
       if (targetLang === 'por' && groupingLangs.has('pob')) {
         targetLang = 'pob';
+        langPenalty = 12;
       } else if (targetLang === 'pob' && groupingLangs.has('por')) {
         targetLang = 'por';
+        langPenalty = 12;
       } else {
         continue;
       }
     }
     const list = byLang.get(targetLang) || [];
-    list.push({ ...sub, lang: targetLang });
+    list.push({ ...sub, lang: targetLang, score: sub.score - langPenalty });
     byLang.set(targetLang, list);
+  }
+
+  for (const list of byLang.values()) {
+    list.sort((a, b) => b.score - a.score);
   }
 
   const cleanBaseUrl = baseUrl.replace(/\/+$/, '');
@@ -307,8 +314,12 @@ export async function getStremioSubtitles(
   }
 
   for (const lang of config.languages) {
-    const matches = byLang.get(lang) || [];
-    const directFallbacks = matches.filter((m) => !m.downloadUrl.startsWith('os://'));
+    const allMatches = byLang.get(lang) || [];
+    const directFallbacks = allMatches.filter((m) => !m.downloadUrl.startsWith('os://'));
+    const matches =
+      directFallbacks.length >= 2
+        ? allMatches.filter((m) => !m.downloadUrl.startsWith('os://') || m.hashMatch)
+        : allMatches;
     let fbIdx = 0;
     for (const sub of matches.slice(0, 15)) {
       const needsProxy =
