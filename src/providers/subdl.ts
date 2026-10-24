@@ -72,12 +72,15 @@ export async function searchSubdl(
       const sub = json.subtitles[i];
       if (!sub.url) continue;
 
+      const cleanUrlPath = sub.url.split('?')[0];
+      if (!cleanUrlPath || /\.rar$/i.test(cleanUrlPath)) continue;
+
       const rawLang = sub.language || sub.lang || 'english';
       const lang = toIso639_2(rawLang);
       const iso1 = toIso639_1(lang);
-      const downloadUrl = sub.url.startsWith('http')
-        ? sub.url
-        : `${SUBDL_DL_BASE}${sub.url.startsWith('/') ? '' : '/'}${sub.url}`;
+      const downloadUrl = cleanUrlPath.startsWith('http')
+        ? cleanUrlPath
+        : `${SUBDL_DL_BASE}${cleanUrlPath.startsWith('/') ? '' : '/'}${cleanUrlPath}`;
 
       const releaseName = sub.release_name || sub.name;
       let score = 82 - Math.min(i, 30);

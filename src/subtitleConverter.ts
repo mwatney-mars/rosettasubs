@@ -104,22 +104,74 @@ export function extractSubtitleFromZip(
 
   if (eocdOffset !== -1) {
     const totalEntries = zipBuf.readUInt16LE(eocdOffset + 10);
-    let cdOffset = zipBuf.readUInt32LE(eocdOffset + 16);
+    const cdStartOffset = zipBuf.readUInt32LE(eocdOffset + 16);
+    let cdOffset = cdStartOffset;
+
+    const cdEntries: {
+      compressionMethod: number;
+      compressedSize: number;
+      uncompressedSize: number;
+      filename: string;
+      localHeaderOffset: number;
+      extraBuf: Buffer;
+    }[] = [];
 
     for (let e = 0; e < totalEntries && cdOffset + 46 <= zipBuf.length; e++) {
       if (zipBuf.readUInt32LE(cdOffset) !== 0x02014b50) break;
       const compressionMethod = zipBuf.readUInt16LE(cdOffset + 10);
       const compressedSize = zipBuf.readUInt32LE(cdOffset + 20);
+      const uncompressedSize = zipBuf.readUInt32LE(cdOffset + 24);
       const fileNameLen = zipBuf.readUInt16LE(cdOffset + 28);
       const extraLen = zipBuf.readUInt16LE(cdOffset + 30);
       const commentLen = zipBuf.readUInt16LE(cdOffset + 32);
       const localHeaderOffset = zipBuf.readUInt32LE(cdOffset + 42);
       const filename = zipBuf.subarray(cdOffset + 46, cdOffset + 46 + fileNameLen).toString('utf8');
+      const extraBuf = zipBuf.subarray(
+        cdOffset + 46 + fileNameLen,
+        cdOffset + 46 + fileNameLen + extraLen
+      );
 
       cdOffset += 46 + fileNameLen + extraLen + commentLen;
+      cdEntries.push({
+        compressionMethod,
+        compressedSize,
+        uncompressedSize,
+        filename,
+        localHeaderOffset,
+        extraBuf
+      });
+    }
+
+    const sortedOffsets = cdEntries
+      .map((entry) => entry.localHeaderOffset)
+      .filter((off) => off < cdStartOffset)
+      .sort((a, b) => a - b);
+
+    for (const entry of cdEntries) {
+      const { compressionMethod, uncompressedSize, filename, localHeaderOffset, extraBuf } = entry;
+      let { compressedSize } = entry;
 
       if (!/\.(srt|vtt|ass|ssa|sub)$/i.test(filename) || filename.startsWith('__MACOSX')) {
         continue;
+      }
+
+      if (compressedSize === 0xffffffff && extraBuf.length >= 4) {
+        let pos = 0;
+        while (pos + 4 <= extraBuf.length) {
+          const tag = extraBuf.readUInt16LE(pos);
+          const size = extraBuf.readUInt16LE(pos + 2);
+          if (tag === 0x0001 && pos + 4 + size <= extraBuf.length) {
+            let fieldOffset = pos + 4;
+            if (uncompressedSize === 0xffffffff && fieldOffset + 8 <= pos + 4 + size) {
+              fieldOffset += 8;
+            }
+            if (fieldOffset + 8 <= pos + 4 + size) {
+              compressedSize = Number(extraBuf.readBigUInt64LE(fieldOffset));
+            }
+            break;
+          }
+          pos += 4 + size;
+        }
       }
 
       if (localHeaderOffset + 30 > zipBuf.length) continue;
@@ -127,8 +179,21 @@ export function extractSubtitleFromZip(
       const localNameLen = zipBuf.readUInt16LE(localHeaderOffset + 26);
       const localExtraLen = zipBuf.readUInt16LE(localHeaderOffset + 28);
       const dataStart = localHeaderOffset + 30 + localNameLen + localExtraLen;
+
+      if (
+        compressedSize === 0xffffffff ||
+        compressedSize === 0 ||
+        dataStart + compressedSize > zipBuf.length
+      ) {
+        const nextOffset =
+          sortedOffsets.find((off) => off > localHeaderOffset) ?? cdStartOffset;
+        if (nextOffset > dataStart) {
+          compressedSize = nextOffset - dataStart;
+        }
+      }
+
       const dataEnd = dataStart + compressedSize;
-      if (dataEnd > zipBuf.length) continue;
+      if (dataEnd > zipBuf.length || dataEnd <= dataStart) continue;
 
       const rawData = zipBuf.subarray(dataStart, dataEnd);
       try {
@@ -186,9 +251,9 @@ export function extractSubtitleFromZip(
     const sPad = String(season).padStart(2, '0');
     const ePad = String(episode).padStart(2, '0');
     const patterns = [
-      new RegExp(`s${sPad}[._\\-\\s]*e${ePad}\\b`, 'i'),
-      new RegExp(`\\b${season}x${ePad}\\b`, 'i'),
-      new RegExp(`\\be${ePad}\\b`, 'i')
+      new RegExp(`s${sPad}[._\\-\\s]*e${ePad}(?:\\b|[^0-9])`, 'i'),
+      new RegExp(`\\b${season}x${ePad}(?:\\b|[^0-9])`, 'i'),
+      new RegExp(`(?:\\b|[._\\-\\s])e(?:p(?:isode)?)?[._\\-\\s]*${ePad}(?:\\b|[^0-9])`, 'i')
     ];
     for (const pattern of patterns) {
       const match = candidates.find((c) => pattern.test(c.filename));

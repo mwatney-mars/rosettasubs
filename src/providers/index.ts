@@ -125,17 +125,29 @@ function toProxyPayload(
   config: AddonConfig,
   fallbackSub?: RawSubtitleResult
 ): ProxyTokenPayload {
-  const isOs = sub.downloadUrl.startsWith('os://');
+  const hasDistinctFallback = Boolean(fallbackSub && fallbackSub.downloadUrl !== sub.downloadUrl);
   return {
     u: sub.downloadUrl,
     f: sub.format,
     e: sub.encoding,
     osKey: sub.provider === 'opensubtitles' ? config.openSubtitlesApiKey : undefined,
-    fb: isOs && fallbackSub ? fallbackSub.downloadUrl : undefined,
-    fbf: isOs && fallbackSub ? fallbackSub.format : undefined,
+    fb: hasDistinctFallback ? fallbackSub!.downloadUrl : undefined,
+    fbf: hasDistinctFallback ? fallbackSub!.format : undefined,
     se: query.season,
     ep: query.episode
   };
+}
+
+function pickFallbackSub(
+  primary: RawSubtitleResult,
+  directCandidates: RawSubtitleResult[],
+  offset = 0
+): RawSubtitleResult | undefined {
+  const distinct = directCandidates.filter((c) => c.downloadUrl !== primary.downloadUrl);
+  if (distinct.length === 0) return undefined;
+  const crossProvider = distinct.filter((c) => c.provider !== primary.provider);
+  const pool = crossProvider.length > 0 ? crossProvider : distinct;
+  return pool[offset % pool.length];
 }
 
 function selectBestCompanion(
@@ -209,16 +221,28 @@ export async function getStremioSubtitles(
 
   if (config.dualSubtitles) {
     const secondaryCandidates = byLang.get(nativeLang) || [];
+    const secondaryDirect = secondaryCandidates.filter((m) => !m.downloadUrl.startsWith('os://'));
     for (const lang of config.languages) {
       if (lang === nativeLang) continue;
       const primaryCandidates = byLang.get(lang) || [];
+      const primaryDirect = primaryCandidates.filter((m) => !m.downloadUrl.startsWith('os://'));
 
       if (primaryCandidates.length > 0 && secondaryCandidates.length > 0) {
         const bestPrimary = primaryCandidates[0];
         const bestSecondary = selectBestCompanion(bestPrimary, secondaryCandidates);
         const dualToken = encodeDualToken({
-          primary: toProxyPayload(bestPrimary, query, config),
-          secondary: toProxyPayload(bestSecondary, query, config),
+          primary: toProxyPayload(
+            bestPrimary,
+            query,
+            config,
+            pickFallbackSub(bestPrimary, primaryDirect)
+          ),
+          secondary: toProxyPayload(
+            bestSecondary,
+            query,
+            config,
+            pickFallbackSub(bestSecondary, secondaryDirect)
+          ),
           primaryLang: lang,
           secondaryLang: nativeLang,
           annotate: Boolean(config.dualSubtitlesAnnotate && hasAiKey),
@@ -236,7 +260,12 @@ export async function getStremioSubtitles(
         if (primaryCandidates.length > 0 && secondaryCandidates.length === 0) {
           const bestPrimary = primaryCandidates[0];
           const dualToken = encodeDualToken({
-            primary: toProxyPayload(bestPrimary, query, config),
+            primary: toProxyPayload(
+              bestPrimary,
+              query,
+              config,
+              pickFallbackSub(bestPrimary, primaryDirect)
+            ),
             primaryLang: lang,
             secondaryLang: nativeLang,
             annotate: Boolean(config.dualSubtitlesAnnotate),
@@ -253,7 +282,12 @@ export async function getStremioSubtitles(
         } else if (primaryCandidates.length === 0 && secondaryCandidates.length > 0) {
           const bestSecondary = secondaryCandidates[0];
           const dualToken = encodeDualToken({
-            secondary: toProxyPayload(bestSecondary, query, config),
+            secondary: toProxyPayload(
+              bestSecondary,
+              query,
+              config,
+              pickFallbackSub(bestSecondary, secondaryDirect)
+            ),
             primaryLang: lang,
             secondaryLang: nativeLang,
             annotate: Boolean(config.dualSubtitlesAnnotate),
@@ -285,10 +319,7 @@ export async function getStremioSubtitles(
 
       let url = sub.downloadUrl;
       if (needsProxy) {
-        const fallbackSub =
-          sub.downloadUrl.startsWith('os://') && directFallbacks.length > 0
-            ? directFallbacks[fbIdx++ % directFallbacks.length]
-            : undefined;
+        const fallbackSub = pickFallbackSub(sub, directFallbacks, fbIdx++);
         const proxyPayload = toProxyPayload(sub, query, config, fallbackSub);
         url = `${cleanBaseUrl}/sub/${encodeProxyToken(proxyPayload)}.srt`;
       }
@@ -324,7 +355,15 @@ export async function getStremioSubtitles(
 
       for (const targetLang of langsNeedingAi) {
         if (bestSource && bestSource.lang !== targetLang) {
-          const srcPayload = toProxyPayload(bestSource, query, config);
+          const srcDirect = filtered.filter(
+            (s) => s.lang === bestSource.lang && !s.downloadUrl.startsWith('os://')
+          );
+          const srcPayload = toProxyPayload(
+            bestSource,
+            query,
+            config,
+            pickFallbackSub(bestSource, srcDirect)
+          );
 
           const translateToken = encodeTranslateToken({
             src: srcPayload,
