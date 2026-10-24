@@ -47,18 +47,10 @@ function formatProviderTag(sub: RawSubtitleResult): string {
   return 'AI';
 }
 
-export function formatSubtitleLabel(sub: RawSubtitleResult, rank: number): string {
+export function formatSubtitleLabel(sub: RawSubtitleResult): string {
   const langTag = formatLangShort(sub.originalLang || sub.lang);
   const providerTag = formatProviderTag(sub);
-  const relSummary = summarizeRelease(sub.releaseName);
-  const flags: string[] = [];
-  if (sub.hashMatch) flags.push('★Hash');
-  if (sub.hearingImpaired) flags.push('HI');
-
-  const parts = [`${langTag} #${rank}`, providerTag];
-  if (relSummary) parts.push(relSummary);
-  if (flags.length > 0) parts.push(flags.join(' '));
-  return parts.join(' • ');
+  return `${langTag} • ${providerTag}`;
 }
 
 export function parseStremioSubtitleRequest(
@@ -408,7 +400,7 @@ export async function getStremioSubtitles(
         url = `${cleanBaseUrl}/sub/${encodeProxyToken(proxyPayload)}.srt`;
       }
 
-      const label = formatSubtitleLabel(sub, idx + 1);
+      const label = formatSubtitleLabel(sub);
       if (descriptiveLang && idx === 0) {
         // Emit standard ISO 639-2 entry first so TV/native players auto-select preferred language
         stremioSubs.push({
@@ -471,15 +463,7 @@ export async function getStremioSubtitles(
             aiBaseUrl: config.aiBaseUrl
           });
 
-          const srcSummary = summarizeRelease(bestSource.releaseName);
-          const label = [
-            formatLangShort(targetLang),
-            `AI (${aiDisplayName})`,
-            `${formatLangShort(bestSource.lang)}→${formatLangShort(targetLang)}`,
-            srcSummary
-          ]
-            .filter(Boolean)
-            .join(' • ');
+          const label = `${formatLangShort(targetLang)} • AI • ${formatLangShort(bestSource.lang)}→${formatLangShort(targetLang)}`;
           const url = `${cleanBaseUrl}/translate/${translateToken}.srt`;
           const aiId = `ai-${config.aiProvider}-${targetLang}-${bestSource.id}`;
 

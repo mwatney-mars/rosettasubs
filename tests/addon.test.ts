@@ -299,21 +299,21 @@ describe('Express Stremio Add-on Routes & Multimodal AI Flow', () => {
 
     expect(engSub).toBeDefined();
     expect(engSub.url).toContain('/sub/');
-    expect(engSub.label).toContain('EN #1 • Wyzie');
+    expect(engSub.label).toBe('EN • Wyzie');
     expect(jpnAiSub).toBeDefined();
     expect(jpnAiSub.id).toContain('ai-gemini-jpn');
     expect(jpnAiSub.url).toContain('/translate/');
-    expect(jpnAiSub.label).toContain('JA • AI (Gemini) • EN→JA');
+    expect(jpnAiSub.label).toBe('JA • AI • EN→JA');
 
     const tvRes = await request(app).get(
       `/${cfg}/subtitles/movie/tt0133093.json?descriptiveLang=1`
     );
     expect(tvRes.status).toBe(200);
-    expect(tvRes.body.subtitles.some((s: { lang: string }) => s.lang.includes('EN #1 • Wyzie'))).toBe(
+    expect(tvRes.body.subtitles.some((s: { lang: string }) => s.lang === 'EN • Wyzie')).toBe(
       true
     );
     expect(
-      tvRes.body.subtitles.some((s: { lang: string }) => s.lang.includes('AI (Gemini)'))
+      tvRes.body.subtitles.some((s: { lang: string }) => s.lang === 'JA • AI • EN→JA')
     ).toBe(true);
   });
 
