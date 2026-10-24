@@ -17,19 +17,19 @@ export interface StremioManifest {
   };
 }
 
-export function buildManifest(config: AddonConfig): StremioManifest {
+export function buildManifest(config: AddonConfig, isConfigured = false): StremioManifest {
+  const baseDescription =
+    'Subtitles in 30+ languages from OpenSubtitles, SubDL, and Wyzie — with instant AI translation when subtitles are missing in your language.';
   const langNames = config.languages.map((l) => getLanguageName(l)).join(', ');
-  const providerList = config.providers.map((p) => p.toUpperCase()).join(' + ');
-  const aiLabel =
-    config.aiMode === 'off'
-      ? 'AI Off'
-      : `AI ${config.aiProvider.toUpperCase()} (${config.aiMode})`;
+  const description = isConfigured
+    ? `${baseDescription} Configured for: ${langNames}.`
+    : baseDescription;
 
   return {
     id: 'org.stremio.rosettasubs',
     version: '1.0.0',
     name: 'RosettaSubs',
-    description: `Multi-provider subtitles (${providerList}) + Multimodal AI translation & transcription [${aiLabel}]. Active languages: ${langNames}.`,
+    description,
     resources: ['subtitles'],
     types: ['movie', 'series'],
     idPrefixes: ['tt'],

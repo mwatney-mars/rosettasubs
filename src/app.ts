@@ -48,7 +48,7 @@ export function createApp() {
 
   app.get(['/manifest.json', '/:config/manifest.json'], (req: Request, res: Response) => {
     const config = decodeConfig(req.params.config);
-    res.json(buildManifest(config));
+    res.json(buildManifest(config, Boolean(req.params.config)));
   });
 
   const handleSubtitles = async (req: Request, res: Response) => {
