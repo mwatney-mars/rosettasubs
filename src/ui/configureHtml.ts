@@ -66,34 +66,24 @@ export function renderConfigurePage(config: AddonConfig, baseUrl: string): strin
       margin-bottom: 2.25rem;
     }
 
-    .brand-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.65rem;
-      padding: 0.4rem 0.9rem 0.4rem 0.5rem;
-      border-radius: 999px;
-      background: rgba(124, 92, 255, 0.1);
-      border: 1px solid rgba(124, 92, 255, 0.28);
-      margin-bottom: 1rem;
-      font-size: 0.8rem;
-      font-weight: 600;
-      color: #d6ccff;
-    }
-
-    .brand-icon {
-      width: 26px;
-      height: 26px;
-      border-radius: 50%;
-      background: linear-gradient(135deg, var(--accent), var(--teal));
+    .hero-title-row {
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      color: #fff;
-      box-shadow: 0 0 16px var(--accent-glow);
+      gap: 0.85rem;
+      margin-bottom: 0.65rem;
+    }
+
+    .hero-logo {
+      width: 52px;
+      height: 52px;
+      border-radius: 14px;
+      box-shadow: 0 8px 28px rgba(124, 92, 255, 0.28);
+      flex-shrink: 0;
     }
 
     header.hero h1 {
-      margin: 0 0 0.55rem;
+      margin: 0;
       font-size: clamp(2rem, 4vw, 2.65rem);
       font-weight: 800;
       letter-spacing: -0.03em;
@@ -672,18 +662,10 @@ export function renderConfigurePage(config: AddonConfig, baseUrl: string): strin
 <body>
   <div class="container">
     <header class="hero">
-      <div style="margin-bottom:0.85rem;">
-        <img src="/logo.svg" alt="RosettaSubs Logo" width="68" height="68" style="border-radius:16px;box-shadow:0 8px 28px rgba(124,92,255,0.28);" />
+      <div class="hero-title-row">
+        <img class="hero-logo" src="/logo.svg" alt="RosettaSubs Logo" width="52" height="52" />
+        <h1>RosettaSubs</h1>
       </div>
-      <div class="brand-badge">
-        <span class="brand-icon">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
-          </svg>
-        </span>
-        <span>Stremio Subtitles Add-on v1.0</span>
-      </div>
-      <h1>RosettaSubs</h1>
       <p class="subtitle">Subtitles in 30+ languages from OpenSubtitles, SubDL, and Wyzie — with dual-language immersion tracks and instant AI translation when subtitles are missing in your language.</p>
       <div class="trust-strip">
         <span class="trust-pill"><span class="trust-dot"></span> Stateless &amp; Zero-Storage</span>
