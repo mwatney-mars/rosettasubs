@@ -278,6 +278,8 @@ class MetricsCollector {
     if (
       req.path === '/health' ||
       req.path === '/logo.svg' ||
+      req.path === '/robots.txt' ||
+      req.path === '/favicon.ico' ||
       req.path.startsWith('/stats') ||
       req.path.startsWith('/api/stats')
     ) {

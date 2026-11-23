@@ -67,6 +67,8 @@ export function createApp() {
     if (
       req.path === '/health' ||
       req.path === '/logo.svg' ||
+      req.path === '/robots.txt' ||
+      req.path === '/favicon.ico' ||
       req.path.startsWith('/stats') ||
       req.path.startsWith('/api/stats')
     ) {
@@ -134,6 +136,28 @@ export function createApp() {
     res.setHeader('Content-Type', 'image/svg+xml; charset=utf-8');
     res.setHeader('Cache-Control', 'public, max-age=86400');
     res.send(LOGO_SVG);
+  });
+
+  app.get('/favicon.ico', (_req: Request, res: Response) => {
+    res.redirect(301, '/logo.svg');
+  });
+
+  app.get('/robots.txt', (_req: Request, res: Response) => {
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    res.send(
+      [
+        'User-agent: *',
+        'Allow: /configure',
+        'Allow: /manifest.json',
+        'Disallow: /subtitles/',
+        'Disallow: /sub/',
+        'Disallow: /translate/',
+        'Disallow: /dual/',
+        'Disallow: /stats',
+        'Disallow: /api/'
+      ].join('\n') + '\n'
+    );
   });
 
   app.get(['/configure', '/:config/configure'], (req: Request, res: Response) => {
