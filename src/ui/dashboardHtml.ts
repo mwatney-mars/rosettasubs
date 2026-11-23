@@ -314,6 +314,7 @@ export function renderDashboardPage(): string {
       <div class="title-row">
         <img src="/logo.svg" alt="RosettaSubs" />
         <h1>RosettaSubs Observability</h1>
+        <span class="meta-status">v1.1.0</span>
         <span class="status-dot" title="LAN private telemetry active"></span>
       </div>
       <div style="display:flex;align-items:center;gap:24px;">
