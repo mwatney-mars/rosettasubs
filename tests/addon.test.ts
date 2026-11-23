@@ -518,13 +518,13 @@ describe('Express Stremio Add-on Routes & Multimodal AI Flow', () => {
     expect(publicBlocked.status).toBe(404);
   });
 
-  it('redirects all non-health requests with CORS headers when REDIRECT_TO_URL is set', async () => {
+  it('redirects all non-health requests with CORS headers when REDIRECT_TO_URL is set and tracks via=render in metrics', async () => {
     process.env.REDIRECT_TO_URL = 'https://rosettasubs.mwatney.com/';
     try {
       const redirectRes = await request(app).get('/subtitles/movie/tt0133093.json');
       expect(redirectRes.status).toBe(307);
       expect(redirectRes.headers.location).toBe(
-        'https://rosettasubs.mwatney.com/subtitles/movie/tt0133093.json'
+        'https://rosettasubs.mwatney.com/subtitles/movie/tt0133093.json?via=render'
       );
       expect(redirectRes.headers['access-control-allow-origin']).toBe('*');
 
@@ -533,5 +533,11 @@ describe('Express Stremio Add-on Routes & Multimodal AI Flow', () => {
     } finally {
       delete process.env.REDIRECT_TO_URL;
     }
+
+    await request(app).get('/manifest.json?via=render');
+    const statsRes = await request(app).get('/api/stats');
+    expect(statsRes.status).toBe(200);
+    expect(statsRes.body.render.redirectRequests).toBeGreaterThanOrEqual(1);
+    expect(statsRes.body.render.legacyUsersTotal).toBeGreaterThanOrEqual(1);
   });
 });

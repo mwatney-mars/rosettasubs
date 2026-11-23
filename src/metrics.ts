@@ -27,11 +27,13 @@ export interface UserRecord {
   requests: number;
   bytesSent: number;
   country: string;
+  viaRender?: boolean;
 }
 
 export interface MinuteBucket {
   minute: number; // Math.floor(Date.now() / 60000)
   requests: number;
+  renderRequests: number;
   bytesSent: number;
   users: Set<string>;
 }
@@ -46,6 +48,7 @@ export interface RecentRequestEvent {
   bytesSent: number;
   clientHash: string;
   country: string;
+  viaRender: boolean;
 }
 
 interface PersistedMetrics {
@@ -53,6 +56,8 @@ interface PersistedMetrics {
   totalRequests: number;
   totalBytesSent: number;
   totalBytesReceived: number;
+  renderRedirectRequests?: number;
+  renderOffloadedBytes?: number;
   byRoute: Record<RouteCategory, RouteMetrics>;
   byStatus: Record<'2xx' | '3xx' | '4xx' | '5xx', number>;
   users: Array<[string, UserRecord]>;
@@ -131,6 +136,8 @@ class MetricsCollector {
   private totalRequests = 0;
   private totalBytesSent = 0;
   private totalBytesReceived = 0;
+  private renderRedirectRequests = 0;
+  private renderOffloadedBytes = 0;
   private byRoute: Record<RouteCategory, RouteMetrics> = createEmptyRouteMap();
   private byStatus: Record<'2xx' | '3xx' | '4xx' | '5xx', number> = {
     '2xx': 0,
@@ -171,6 +178,12 @@ class MetricsCollector {
       if (typeof data.totalBytesReceived === 'number') {
         this.totalBytesReceived = data.totalBytesReceived;
       }
+      if (typeof data.renderRedirectRequests === 'number') {
+        this.renderRedirectRequests = data.renderRedirectRequests;
+      }
+      if (typeof data.renderOffloadedBytes === 'number') {
+        this.renderOffloadedBytes = data.renderOffloadedBytes;
+      }
       if (data.byRoute) {
         for (const r of ROUTE_CATEGORIES) {
           if (data.byRoute[r]) {
@@ -207,6 +220,8 @@ class MetricsCollector {
         totalRequests: this.totalRequests,
         totalBytesSent: this.totalBytesSent,
         totalBytesReceived: this.totalBytesReceived,
+        renderRedirectRequests: this.renderRedirectRequests,
+        renderOffloadedBytes: this.renderOffloadedBytes,
         byRoute: this.byRoute,
         byStatus: this.byStatus,
         users: Array.from(this.users.entries()).slice(-25000),
@@ -240,10 +255,16 @@ class MetricsCollector {
     const now = Date.now();
     const route = classifyRoute(req.path);
     const { clientHash, country } = extractClientHashAndCountry(req);
+    const referer = String(req.headers.referer || '');
+    const viaRender = req.query.via === 'render' || referer.includes('onrender.com');
 
     this.totalRequests++;
     this.totalBytesSent += bytesSent;
     this.totalBytesReceived += bytesReceived;
+    if (viaRender) {
+      this.renderRedirectRequests++;
+      this.renderOffloadedBytes += bytesSent;
+    }
 
     const rm = this.byRoute[route];
     rm.count++;
@@ -262,6 +283,7 @@ class MetricsCollector {
       existingUser.requests++;
       existingUser.bytesSent += bytesSent;
       if (country !== 'LAN') existingUser.country = country;
+      if (viaRender) existingUser.viaRender = true;
     } else {
       if (this.users.size >= 50000) {
         const oldestKey = this.users.keys().next().value;
@@ -272,14 +294,15 @@ class MetricsCollector {
         lastSeen: now,
         requests: 1,
         bytesSent,
-        country
+        country,
+        viaRender
       });
     }
 
     const curMin = Math.floor(now / 60000);
     let bucket = this.minuteBuckets.get(curMin);
     if (!bucket) {
-      bucket = { minute: curMin, requests: 0, bytesSent: 0, users: new Set() };
+      bucket = { minute: curMin, requests: 0, renderRequests: 0, bytesSent: 0, users: new Set() };
       this.minuteBuckets.set(curMin, bucket);
       if (this.minuteBuckets.size > 120) {
         const oldestMin = this.minuteBuckets.keys().next().value;
@@ -287,6 +310,7 @@ class MetricsCollector {
       }
     }
     bucket.requests++;
+    if (viaRender) bucket.renderRequests++;
     bucket.bytesSent += bytesSent;
     bucket.users.add(clientHash);
 
@@ -306,7 +330,8 @@ class MetricsCollector {
       durationMs,
       bytesSent,
       clientHash,
-      country
+      country,
+      viaRender
     });
     if (this.recentEvents.length > 120) {
       this.recentEvents.pop();
@@ -347,14 +372,20 @@ class MetricsCollector {
     let active1h = 0;
     let active24h = 0;
     let active7d = 0;
+    let renderUsers24h = 0;
+    let renderUsersTotal = 0;
     const countryCounts = new Map<string, number>();
 
     for (const u of this.users.values()) {
       const age = now - u.lastSeen;
       if (age <= 5 * 60_000) active5m++;
       if (age <= 60 * 60_000) active1h++;
-      if (age <= 24 * 3600_000) active24h++;
+      if (age <= 24 * 3600_000) {
+        active24h++;
+        if (u.viaRender) renderUsers24h++;
+      }
       if (age <= 7 * 24 * 3600_000) active7d++;
+      if (u.viaRender) renderUsersTotal++;
       countryCounts.set(u.country, (countryCounts.get(u.country) || 0) + 1);
     }
 
@@ -363,6 +394,7 @@ class MetricsCollector {
       minuteOffset: number;
       label: string;
       requests: number;
+      renderRequests: number;
       bytesSent: number;
       uniqueUsers: number;
     }> = [];
@@ -377,6 +409,7 @@ class MetricsCollector {
         minuteOffset: -i,
         label: `${hh}:${mm}`,
         requests: b ? b.requests : 0,
+        renderRequests: b ? b.renderRequests : 0,
         bytesSent: b ? b.bytesSent : 0,
         uniqueUsers: b ? b.users.size : 0
       });
@@ -428,6 +461,14 @@ class MetricsCollector {
         p95LatencyMs: p95Ms,
         byStatus: this.byStatus,
         byRoute: this.byRoute
+      },
+      render: {
+        redirectRequests: this.renderRedirectRequests,
+        redirectRequests60m: timeline60m.reduce((s, x) => s + x.renderRequests, 0),
+        legacyUsers24h: renderUsers24h,
+        legacyUsersTotal: renderUsersTotal,
+        estimatedRenderHeaderBytes: this.renderRedirectRequests * 220,
+        offloadedBytes: this.renderOffloadedBytes
       },
       cache: {
         hitRatePercent: cacheHitRate,

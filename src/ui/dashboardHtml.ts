@@ -91,15 +91,15 @@ export function renderDashboardPage(): string {
       font-variant-numeric: tabular-nums;
     }
 
-    /* 4 Compact Stat Cards (Numbers Only) */
+    /* 5 Compact Stat Cards (Numbers Only) */
     .kpi-grid {
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
+      grid-template-columns: repeat(5, 1fr);
       gap: 16px;
       margin-bottom: 24px;
     }
 
-    @media (max-width: 960px) {
+    @media (max-width: 1120px) {
       .kpi-grid {
         grid-template-columns: repeat(2, 1fr);
       }
@@ -343,6 +343,11 @@ export function renderDashboardPage(): string {
         <div id="kpiCacheHit" class="kpi-value">0%</div>
         <div class="kpi-sub">Search <strong id="kpiSearchCache">0</strong> • SRT <strong id="kpiSubCache">0</strong> • RSS <strong id="kpiRam">0 MB</strong></div>
       </div>
+      <div class="card">
+        <div class="kpi-label">Render redirects</div>
+        <div id="kpiRenderReqs" class="kpi-value">0</div>
+        <div class="kpi-sub">Users <strong id="kpiRenderUsers">0</strong> • Saved <strong id="kpiRenderSaved">0 B</strong></div>
+      </div>
     </div>
 
     <div class="main-grid">
@@ -469,6 +474,12 @@ export function renderDashboardPage(): string {
         document.getElementById('kpiSubCache').textContent = d.cache.subtitles.size + '/' + d.cache.subtitles.maxEntries;
         document.getElementById('kpiRam').textContent = Math.round(d.system.rssBytes / (1024 * 1024)) + ' MB';
 
+        if (d.render) {
+          document.getElementById('kpiRenderReqs').textContent = d.render.redirectRequests.toLocaleString();
+          document.getElementById('kpiRenderUsers').textContent = d.render.legacyUsersTotal.toLocaleString();
+          document.getElementById('kpiRenderSaved').textContent = fmtBytes(d.render.offloadedBytes);
+        }
+
         const st = d.traffic.byStatus;
         document.getElementById('statusSummary').textContent =
           '2xx ' + st['2xx'] + ' • 3xx ' + st['3xx'] + ' • 4xx ' + st['4xx'] + ' • 5xx ' + st['5xx'];
@@ -525,9 +536,10 @@ export function renderDashboardPage(): string {
         d.recentEvents.forEach((ev) => {
           const tr = document.createElement('tr');
           const stClass = ev.status >= 500 ? 'status-err' : ev.status >= 400 ? 'status-warn' : 'status-ok';
+          const srcTag = ev.viaRender ? ' • <span class="status-warn">render</span>' : '';
           tr.innerHTML =
             '<td class="mono">' + ev.ts.slice(11, 19) + '</td>' +
-            '<td>' + ev.route + '</td>' +
+            '<td>' + ev.route + srcTag + '</td>' +
             '<td class="mono">' + ev.path.replace(/</g, '&lt;') + '</td>' +
             '<td class="num ' + stClass + '">' + ev.status + '</td>' +
             '<td class="num">' + ev.durationMs + ' ms</td>' +

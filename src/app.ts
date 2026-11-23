@@ -54,7 +54,11 @@ export function createApp() {
       next();
       return;
     }
-    const targetUrl = `${redirectBase}${req.originalUrl || '/'}`;
+    const orig = req.originalUrl || '/';
+    const sep = orig.includes('?') ? '&' : '?';
+    const targetUrl = orig.includes('via=render')
+      ? `${redirectBase}${orig}`
+      : `${redirectBase}${orig}${sep}via=render`;
     res.setHeader('Cache-Control', 'public, max-age=3600');
     res.redirect(307, targetUrl);
   });
