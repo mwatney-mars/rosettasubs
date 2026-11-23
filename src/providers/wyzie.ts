@@ -31,81 +31,91 @@ const STREMIO_OSV3_BASE =
 
 async function searchStremioOsV3(
   query: SubtitleQuery,
-  timeoutMs = 6000
+  timeoutMs = 4000
 ): Promise<RawSubtitleResult[]> {
   const idPart =
     query.type === 'series' && query.season !== undefined && query.episode !== undefined
       ? `${query.imdbId}:${query.season}:${query.episode}`
       : query.imdbId;
 
-  const extraParts: string[] = [];
-  if (query.videoHash) extraParts.push(`videoHash=${encodeURIComponent(query.videoHash)}`);
-  if (query.videoSize) extraParts.push(`videoSize=${encodeURIComponent(String(query.videoSize))}`);
-  if (query.filename) extraParts.push(`filename=${encodeURIComponent(query.filename)}`);
+  const osv3CacheKey = `osv3-raw:${query.type}:${idPart}:${query.videoHash ?? ''}`;
+  let rawSubs = searchCache.get(osv3CacheKey) as StremioOsV3Item[] | undefined;
 
-  const path =
-    extraParts.length > 0
-      ? `/subtitles/${query.type}/${encodeURIComponent(idPart)}/${extraParts.join('&')}.json`
-      : `/subtitles/${query.type}/${encodeURIComponent(idPart)}.json`;
+  if (!rawSubs) {
+    const extraParts: string[] = [];
+    if (query.videoHash) extraParts.push(`videoHash=${encodeURIComponent(query.videoHash)}`);
+    if (query.videoSize) extraParts.push(`videoSize=${encodeURIComponent(String(query.videoSize))}`);
+    if (query.filename) extraParts.push(`filename=${encodeURIComponent(query.filename)}`);
 
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
+    const path =
+      extraParts.length > 0
+        ? `/subtitles/${query.type}/${encodeURIComponent(idPart)}/${extraParts.join('&')}.json`
+        : `/subtitles/${query.type}/${encodeURIComponent(idPart)}.json`;
 
-  try {
-    const res = await fetch(`${STREMIO_OSV3_BASE}${path}`, {
-      headers: {
-        Accept: 'application/json',
-        'User-Agent': 'RosettaSubs/1.0'
-      },
-      signal: controller.signal
-    });
-    if (!res.ok) return [];
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
 
-    const json = (await res.json()) as { subtitles?: StremioOsV3Item[] };
-    if (!Array.isArray(json.subtitles)) return [];
-
-    const results: RawSubtitleResult[] = [];
-    const langCounts = new Map<string, number>();
-    for (let i = 0; i < json.subtitles.length; i++) {
-      const item = json.subtitles[i];
-      if (!item.url || !item.lang) continue;
-
-      const lang = toIso639_2(item.lang);
-      const iso1 = toIso639_1(lang);
-      const langIdx = langCounts.get(lang) || 0;
-      langCounts.set(lang, langIdx + 1);
-
-      const hashMatch = item.m === 'h';
-      const releaseName = item.movieReleaseName || item.subtitleFileName;
-      let score = 85 - Math.min(langIdx, 30);
-      if (hashMatch) score += 50;
-      score += scoreReleaseMatch(query.filename, releaseName, item.releaseFormat);
-
-      results.push({
-        id: `osv3-${item.id || i}-${lang}`,
-        provider: 'wyzie',
-        downloadUrl: item.url,
-        lang,
-        iso639_1: iso1,
-        format: 'srt',
-        encoding: 'UTF-8', // subencoding-stremio-utf8 URLs are already UTF-8
-        releaseName,
-        hearingImpaired: false,
-        hashMatch,
-        score
+    try {
+      const res = await fetch(`${STREMIO_OSV3_BASE}${path}`, {
+        headers: {
+          Accept: 'application/json',
+          'User-Agent': 'RosettaSubs/1.0'
+        },
+        signal: controller.signal
       });
+      if (res.ok) {
+        const json = (await res.json()) as { subtitles?: StremioOsV3Item[] };
+        if (Array.isArray(json.subtitles) && json.subtitles.length > 0) {
+          rawSubs = json.subtitles;
+          searchCache.set(osv3CacheKey, rawSubs);
+        }
+      }
+    } catch {
+      return [];
+    } finally {
+      clearTimeout(timer);
     }
-    return results;
-  } catch {
-    return [];
-  } finally {
-    clearTimeout(timer);
   }
+
+  if (!rawSubs || rawSubs.length === 0) return [];
+
+  const results: RawSubtitleResult[] = [];
+  const langCounts = new Map<string, number>();
+  for (let i = 0; i < rawSubs.length; i++) {
+    const item = rawSubs[i];
+    if (!item.url || !item.lang) continue;
+
+    const lang = toIso639_2(item.lang);
+    const iso1 = toIso639_1(lang);
+    const langIdx = langCounts.get(lang) || 0;
+    langCounts.set(lang, langIdx + 1);
+
+    const hashMatch = item.m === 'h';
+    const releaseName = item.movieReleaseName || item.subtitleFileName;
+    let score = 85 - Math.min(langIdx, 30);
+    if (hashMatch) score += 50;
+    score += scoreReleaseMatch(query.filename, releaseName, item.releaseFormat);
+
+    results.push({
+      id: `osv3-${item.id || i}-${lang}`,
+      provider: 'wyzie',
+      downloadUrl: item.url,
+      lang,
+      iso639_1: iso1,
+      format: 'srt',
+      encoding: 'UTF-8',
+      releaseName,
+      hearingImpaired: false,
+      hashMatch,
+      score
+    });
+  }
+  return results;
 }
 
 export async function searchWyzie(
   query: SubtitleQuery,
-  timeoutMs = 7000
+  timeoutMs = 3500
 ): Promise<RawSubtitleResult[]> {
   if (!query.imdbId) return [];
 

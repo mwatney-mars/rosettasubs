@@ -145,6 +145,7 @@ export function createApp() {
 
   app.get(['/manifest.json', '/:config/manifest.json'], (req: Request, res: Response) => {
     const config = decodeConfig(req.params.config);
+    res.setHeader('Cache-Control', 'public, max-age=3600, s-maxage=86400, stale-while-revalidate=86400');
     res.json(buildManifest(config, Boolean(req.params.config), resolveBaseUrl(req)));
   });
 
