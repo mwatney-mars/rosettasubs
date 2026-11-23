@@ -9,6 +9,8 @@ services:
         value: production
       - key: PORT
         value: 7000
+      - key: REDIRECT_TO_URL
+        value: https://rosettasubs.mwatney.com
       - key: DEFAULT_LANGUAGES
         value: eng,spa,fre
       - key: OPENSUBTITLES_API_KEY

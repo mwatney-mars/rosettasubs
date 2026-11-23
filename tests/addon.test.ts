@@ -517,4 +517,21 @@ describe('Express Stremio Add-on Routes & Multimodal AI Flow', () => {
       .set('cf-connecting-ip', '203.0.113.42');
     expect(publicBlocked.status).toBe(404);
   });
+
+  it('redirects all non-health requests with CORS headers when REDIRECT_TO_URL is set', async () => {
+    process.env.REDIRECT_TO_URL = 'https://rosettasubs.mwatney.com/';
+    try {
+      const redirectRes = await request(app).get('/subtitles/movie/tt0133093.json');
+      expect(redirectRes.status).toBe(307);
+      expect(redirectRes.headers.location).toBe(
+        'https://rosettasubs.mwatney.com/subtitles/movie/tt0133093.json'
+      );
+      expect(redirectRes.headers['access-control-allow-origin']).toBe('*');
+
+      const healthRes = await request(app).get('/health');
+      expect(healthRes.status).toBe(200);
+    } finally {
+      delete process.env.REDIRECT_TO_URL;
+    }
+  });
 });

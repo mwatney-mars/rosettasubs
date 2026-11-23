@@ -44,6 +44,22 @@ export function createApp() {
   app.use(express.json({ limit: '25mb' }));
 
   app.use((req: Request, res: Response, next) => {
+    const redirectBase = (
+      process.env.REDIRECT_TO_URL ||
+      (process.env.RENDER === 'true' ? 'https://rosettasubs.mwatney.com' : '')
+    )
+      .trim()
+      .replace(/\/+$/, '');
+    if (!redirectBase || req.path === '/health') {
+      next();
+      return;
+    }
+    const targetUrl = `${redirectBase}${req.originalUrl || '/'}`;
+    res.setHeader('Cache-Control', 'public, max-age=3600');
+    res.redirect(307, targetUrl);
+  });
+
+  app.use((req: Request, res: Response, next) => {
     if (
       req.path === '/health' ||
       req.path === '/logo.svg' ||
