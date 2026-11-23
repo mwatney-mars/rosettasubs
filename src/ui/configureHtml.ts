@@ -16,25 +16,18 @@ export function renderConfigurePage(config: AddonConfig, baseUrl: string): strin
   <title>RosettaSubs — Stremio Subtitles Configuration</title>
   <style>
     :root {
-      --bg: #07090f;
-      --bg-elevated: #0f1320;
-      --card: rgba(19, 24, 38, 0.82);
-      --card-hover: rgba(25, 32, 50, 0.92);
-      --input-bg: #090c15;
-      --border: rgba(255, 255, 255, 0.08);
-      --border-strong: rgba(255, 255, 255, 0.15);
-      --accent: #7c5cff;
-      --accent-hover: #6946ff;
-      --accent-soft: rgba(124, 92, 255, 0.14);
-      --accent-glow: rgba(124, 92, 255, 0.35);
-      --teal: #2dd4bf;
-      --teal-soft: rgba(45, 212, 191, 0.12);
-      --text: #f3f5fb;
-      --text-secondary: #c4cadb;
-      --muted: #8590ad;
-      --radius-lg: 18px;
-      --radius-md: 12px;
-      --radius-sm: 8px;
+      --bg-deep: #0f0f10;
+      --bg: #141415;
+      --card: #19191b;
+      --raised: #232325;
+      --hairline: rgba(237, 237, 237, 0.08);
+      --hairline-strong: rgba(237, 237, 237, 0.16);
+      --text: #ededed;
+      --text-secondary: #a1a1a6;
+      --muted: #85858b;
+      --accent: #e5a93c;
+      --positive: #4cc38a;
+      --ease: cubic-bezier(0.22, 1, 0.36, 1);
     }
 
     * {
@@ -45,240 +38,375 @@ export function renderConfigurePage(config: AddonConfig, baseUrl: string): strin
       margin: 0;
       font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       background-color: var(--bg);
-      background-image:
-        radial-gradient(ellipse 80% 50% at 50% -15%, rgba(124, 92, 255, 0.25), transparent),
-        radial-gradient(ellipse 60% 40% at 85% 10%, rgba(45, 212, 191, 0.10), transparent);
       color: var(--text);
       min-height: 100vh;
-      padding: 2.5rem 1.25rem 5rem;
-      line-height: 1.5;
+      padding: 0 24px 64px;
+      font-size: 14px;
+      line-height: 20px;
+      font-weight: 400;
       -webkit-font-smoothing: antialiased;
     }
 
-    .container {
-      max-width: 840px;
+    .shell {
+      max-width: 1120px;
       margin: 0 auto;
     }
 
-    /* Hero Header */
+    /* Top Bar */
+    .topbar {
+      height: 64px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--hairline);
+      margin-bottom: 48px;
+    }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      color: var(--text);
+      text-decoration: none;
+    }
+
+    .brand img {
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      display: block;
+    }
+
+    .brand-name {
+      font-size: 16px;
+      line-height: 16px;
+      font-weight: 500;
+      color: var(--text);
+    }
+
+    .topbar-meta {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 12px;
+      line-height: 16px;
+      color: var(--muted);
+    }
+
+    .topbar-link {
+      color: var(--text-secondary);
+      text-decoration: none;
+      font-family: Inter, -apple-system, sans-serif;
+      font-size: 13px;
+      transition: color 150ms var(--ease);
+    }
+
+    .topbar-link:hover {
+      color: var(--text);
+    }
+
+    /* Split Hero */
     header.hero {
-      text-align: center;
-      margin-bottom: 2.25rem;
-    }
-
-    .hero-title-row {
-      display: inline-flex;
+      display: grid;
+      grid-template-columns: 1fr 1.15fr;
+      gap: 48px;
       align-items: center;
-      justify-content: center;
-      gap: 0.85rem;
-      margin-bottom: 0.65rem;
+      margin-bottom: 64px;
     }
 
-    .hero-logo {
-      width: 52px;
-      height: 52px;
-      border-radius: 14px;
-      box-shadow: 0 8px 28px rgba(124, 92, 255, 0.28);
-      flex-shrink: 0;
+    @media (max-width: 860px) {
+      header.hero {
+        grid-template-columns: 1fr;
+        gap: 32px;
+        margin-bottom: 48px;
+      }
     }
 
-    header.hero h1 {
-      margin: 0;
-      font-size: clamp(2rem, 4vw, 2.65rem);
-      font-weight: 800;
-      letter-spacing: -0.03em;
-      background: linear-gradient(135deg, #ffffff 30%, #b9c2dc 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
+    .hero-copy h1 {
+      margin: 0 0 16px;
+      font-size: 40px;
+      line-height: 44px;
+      font-weight: 500;
+      letter-spacing: -0.02em;
+      color: var(--text);
     }
 
-    header.hero p.subtitle {
-      margin: 0 auto 1rem;
-      max-width: 580px;
-      color: var(--muted);
-      font-size: 1rem;
+    .hero-copy p.subtitle {
+      margin: 0 0 24px;
+      max-width: 480px;
+      font-size: 16px;
+      line-height: 24px;
+      color: var(--text-secondary);
     }
 
-    .trust-strip {
-      display: inline-flex;
+    .hero-specs {
+      display: flex;
       flex-wrap: wrap;
-      justify-content: center;
-      gap: 0.6rem;
-      font-size: 0.78rem;
+      gap: 16px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 12px;
+      line-height: 16px;
       color: var(--muted);
     }
 
-    .trust-pill {
+    .hero-spec-item {
       display: inline-flex;
       align-items: center;
-      gap: 0.35rem;
-      padding: 0.28rem 0.68rem;
-      border-radius: 999px;
-      background: rgba(255, 255, 255, 0.03);
-      border: 1px solid var(--border);
+      gap: 8px;
     }
 
-    .trust-dot {
+    .spec-dot {
       width: 6px;
       height: 6px;
       border-radius: 50%;
-      background: var(--teal);
+      background: var(--accent);
+    }
+
+    /* Cinema Subtitle Bench Preview (The Moment) */
+    .cinema-stage {
+      background: var(--bg-deep);
+      border: 1px solid var(--hairline);
+      border-radius: 16px;
+      padding: 16px;
+    }
+
+    .cinema-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 12px;
+      line-height: 16px;
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .cinema-screen {
+      position: relative;
+      height: 208px;
+      border-radius: 8px;
+      background:
+        linear-gradient(180deg, rgba(15, 15, 16, 0.2) 0%, rgba(15, 15, 16, 0.92) 100%),
+        repeating-linear-gradient(90deg, #18181b 0px, #18181b 1px, #131315 1px, #131315 24px);
+      border: 1px solid var(--hairline);
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      align-items: center;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .cinema-scene-meta {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      right: 16px;
+      display: flex;
+      justify-content: space-between;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 12px;
+      line-height: 16px;
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .cinema-cue-box {
+      background: rgba(15, 15, 16, 0.88);
+      border: 1px solid var(--hairline);
+      border-radius: 8px;
+      padding: 12px 20px;
+      max-width: 100%;
+    }
+
+    .cinema-line-primary {
+      font-size: 16px;
+      line-height: 24px;
+      font-weight: 500;
+      color: var(--text);
+    }
+
+    .cinema-line-note {
+      color: var(--accent);
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 12px;
+      margin-left: 8px;
+      font-weight: 400;
+    }
+
+    .cinema-line-secondary {
+      margin-top: 4px;
+      font-size: 14px;
+      line-height: 20px;
+      color: var(--accent);
+    }
+
+    /* Main 2-Column Layout */
+    .workspace {
+      display: grid;
+      grid-template-columns: 1fr 360px;
+      gap: 24px;
+      align-items: start;
+    }
+
+    @media (max-width: 920px) {
+      .workspace {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .steps-col {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
     }
 
     /* Section Cards */
     .card {
       background: var(--card);
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-lg);
-      padding: 1.6rem;
-      margin-bottom: 1.25rem;
-      box-shadow: 0 18px 40px rgba(0, 0, 0, 0.32);
-      transition: border-color 0.2s;
-    }
-
-    .card:hover {
-      border-color: var(--border-strong);
+      border: 1px solid var(--hairline);
+      border-radius: 16px;
+      padding: 24px;
+      transition: border-color 150ms var(--ease);
     }
 
     .card-header {
       display: flex;
-      align-items: flex-start;
+      align-items: baseline;
       justify-content: space-between;
-      gap: 1rem;
-      margin-bottom: 1.15rem;
+      gap: 16px;
+      margin-bottom: 16px;
       flex-wrap: wrap;
     }
 
     .step-title {
       display: flex;
-      align-items: center;
-      gap: 0.65rem;
-      margin: 0 0 0.25rem;
-      font-size: 1.15rem;
-      font-weight: 700;
-      letter-spacing: -0.01em;
+      align-items: baseline;
+      gap: 12px;
+      margin: 0 0 4px;
+      font-size: 16px;
+      line-height: 24px;
+      font-weight: 500;
+      color: var(--text);
     }
 
     .step-num {
-      width: 26px;
-      height: 26px;
-      border-radius: 8px;
-      background: var(--accent-soft);
-      border: 1px solid rgba(124, 92, 255, 0.35);
-      color: #cbbaff;
-      font-size: 0.82rem;
-      font-weight: 700;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      flex-shrink: 0;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 12px;
+      line-height: 16px;
+      font-weight: 400;
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
     }
 
     .card p.hint {
       margin: 0;
-      color: var(--muted);
-      font-size: 0.88rem;
+      color: var(--text-secondary);
+      font-size: 13px;
+      line-height: 20px;
     }
 
     .badge-count {
-      font-size: 0.78rem;
-      font-weight: 600;
-      padding: 0.3rem 0.7rem;
-      border-radius: 999px;
-      background: var(--accent-soft);
-      color: #d4c6ff;
-      border: 1px solid rgba(124, 92, 255, 0.3);
-      white-space: nowrap;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 12px;
+      line-height: 16px;
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
     }
 
     /* Language Selector */
     .selected-chips {
       display: flex;
       flex-wrap: wrap;
-      gap: 0.45rem;
-      margin-bottom: 0.9rem;
+      gap: 8px;
+      margin-bottom: 16px;
     }
 
     .chip {
       display: inline-flex;
       align-items: center;
-      gap: 0.4rem;
-      padding: 0.32rem 0.65rem;
-      border-radius: 999px;
-      background: linear-gradient(135deg, rgba(124, 92, 255, 0.22), rgba(124, 92, 255, 0.1));
-      border: 1px solid rgba(124, 92, 255, 0.45);
-      color: #f0ecff;
-      font-size: 0.82rem;
-      font-weight: 500;
+      height: 28px;
+      gap: 8px;
+      padding: 0 10px;
+      border-radius: 6px;
+      background: var(--raised);
+      border: 1px solid var(--hairline);
+      color: var(--text);
+      font-size: 13px;
+      line-height: 20px;
     }
 
     .chip button {
       background: none;
       border: none;
-      color: #cbbaff;
+      color: var(--muted);
       cursor: pointer;
       padding: 0;
-      font-size: 0.95rem;
+      font-size: 14px;
       line-height: 1;
       display: inline-flex;
       align-items: center;
+      transition: color 120ms var(--ease);
     }
 
     .chip button:hover {
-      color: #fff;
+      color: var(--text);
     }
 
     .lang-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
-      gap: 0.5rem;
-      max-height: 310px;
+      grid-template-columns: repeat(auto-fill, minmax(188px, 1fr));
+      gap: 8px;
+      max-height: 296px;
       overflow-y: auto;
-      padding: 0.25rem;
+      padding-right: 4px;
       scrollbar-width: thin;
-      scrollbar-color: rgba(255, 255, 255, 0.16) transparent;
+      scrollbar-color: var(--raised) transparent;
     }
 
     .pill {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 0.5rem;
-      padding: 0.55rem 0.75rem;
-      background: rgba(255, 255, 255, 0.02);
-      border: 1px solid var(--border);
-      border-radius: 10px;
+      height: 36px;
+      gap: 8px;
+      padding: 0 12px;
+      background: var(--bg);
+      border: 1px solid var(--hairline);
+      border-radius: 8px;
       cursor: pointer;
-      font-size: 0.87rem;
+      font-size: 13px;
+      line-height: 20px;
+      color: var(--text-secondary);
       user-select: none;
-      transition: all 0.15s ease;
+      transition: background-color 120ms var(--ease), border-color 120ms var(--ease), color 120ms var(--ease);
     }
 
     .pill:hover {
-      border-color: rgba(124, 92, 255, 0.5);
-      background: rgba(255, 255, 255, 0.04);
+      border-color: var(--hairline-strong);
+      color: var(--text);
     }
 
     .pill.active {
-      background: var(--accent-soft);
-      border-color: var(--accent);
-      color: #fff;
-      box-shadow: inset 0 0 0 1px rgba(124, 92, 255, 0.25);
+      background: var(--raised);
+      border-color: var(--hairline-strong);
+      color: var(--text);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
     }
 
     .pill-left {
       display: flex;
       align-items: center;
-      gap: 0.55rem;
+      gap: 8px;
       min-width: 0;
     }
 
     .pill input[type="checkbox"] {
       accent-color: var(--accent);
-      width: 15px;
-      height: 15px;
+      width: 14px;
+      height: 14px;
       margin: 0;
       cursor: pointer;
       flex-shrink: 0;
@@ -288,113 +416,104 @@ export function renderConfigurePage(config: AddonConfig, baseUrl: string): strin
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+      font-weight: 400;
+    }
+
+    .pill.active .pill-name {
       font-weight: 500;
     }
 
     .pill-code {
       font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-      font-size: 0.72rem;
+      font-size: 12px;
+      line-height: 16px;
       color: var(--muted);
-      background: rgba(255, 255, 255, 0.05);
-      padding: 0.1rem 0.38rem;
-      border-radius: 5px;
-      text-transform: uppercase;
       flex-shrink: 0;
-    }
-
-    .pill.active .pill-code {
-      color: #d8ceff;
-      background: rgba(124, 92, 255, 0.25);
     }
 
     /* Provider Cards */
     .provider-stack {
       display: flex;
       flex-direction: column;
-      gap: 0.85rem;
+      gap: 12px;
     }
 
     .provider-card {
-      background: rgba(9, 12, 21, 0.65);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-md);
-      padding: 1rem 1.15rem;
-      transition: border-color 0.15s, background 0.15s;
+      background: var(--bg);
+      border: 1px solid var(--hairline);
+      border-radius: 8px;
+      padding: 16px;
+      transition: border-color 150ms var(--ease), background-color 150ms var(--ease);
     }
 
     .provider-card.active {
-      border-color: rgba(124, 92, 255, 0.45);
-      background: rgba(18, 23, 39, 0.85);
+      background: var(--raised);
+      border-color: var(--hairline-strong);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
     }
 
     .provider-top {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 0.75rem;
+      gap: 12px;
       flex-wrap: wrap;
     }
 
     .provider-label {
       display: flex;
       align-items: center;
-      gap: 0.65rem;
+      gap: 10px;
       cursor: pointer;
-      font-weight: 600;
-      font-size: 0.96rem;
+      font-weight: 500;
+      font-size: 14px;
+      line-height: 20px;
+      color: var(--text);
     }
 
     .provider-label input[type="checkbox"] {
       accent-color: var(--accent);
-      width: 17px;
-      height: 17px;
+      width: 16px;
+      height: 16px;
       margin: 0;
       cursor: pointer;
     }
 
     .tag {
-      font-size: 0.72rem;
-      font-weight: 600;
-      padding: 0.18rem 0.55rem;
-      border-radius: 999px;
-      letter-spacing: 0.01em;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 12px;
+      line-height: 16px;
+      color: var(--muted);
     }
 
     .tag-free {
-      background: var(--teal-soft);
-      color: var(--teal);
-      border: 1px solid rgba(45, 212, 191, 0.3);
-    }
-
-    .tag-key {
-      background: rgba(255, 255, 255, 0.05);
-      color: var(--text-secondary);
-      border: 1px solid var(--border);
+      color: var(--positive);
     }
 
     .ext-link {
-      font-size: 0.8rem;
-      color: #a58fff;
+      font-size: 13px;
+      line-height: 20px;
+      color: var(--text-secondary);
       text-decoration: none;
-      font-weight: 500;
       display: inline-flex;
       align-items: center;
-      gap: 0.25rem;
+      gap: 4px;
+      transition: color 120ms var(--ease);
     }
 
     .ext-link:hover {
-      color: #c6b8ff;
-      text-decoration: underline;
+      color: var(--text);
     }
 
     .provider-desc {
-      margin: 0.35rem 0 0;
-      color: var(--muted);
-      font-size: 0.83rem;
+      margin: 8px 0 0;
+      color: var(--text-secondary);
+      font-size: 13px;
+      line-height: 20px;
     }
 
     .provider-key-row {
-      margin-top: 0.75rem;
+      margin-top: 12px;
       position: relative;
       display: flex;
       align-items: center;
@@ -404,8 +523,8 @@ export function renderConfigurePage(config: AddonConfig, baseUrl: string): strin
     .field-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 1rem;
-      margin-top: 0.85rem;
+      gap: 16px;
+      margin-top: 16px;
     }
 
     @media (max-width: 640px) {
@@ -417,9 +536,10 @@ export function renderConfigurePage(config: AddonConfig, baseUrl: string): strin
     label.field {
       display: flex;
       flex-direction: column;
-      gap: 0.4rem;
-      font-size: 0.84rem;
-      font-weight: 500;
+      gap: 8px;
+      font-size: 13px;
+      line-height: 20px;
+      font-weight: 400;
       color: var(--text-secondary);
     }
 
@@ -427,7 +547,7 @@ export function renderConfigurePage(config: AddonConfig, baseUrl: string): strin
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 0.5rem;
+      gap: 8px;
     }
 
     .input-with-toggle {
@@ -441,58 +561,62 @@ export function renderConfigurePage(config: AddonConfig, baseUrl: string): strin
     input[type="password"],
     select {
       width: 100%;
-      background: var(--input-bg);
-      border: 1px solid var(--border);
+      height: 36px;
+      background: var(--bg-deep);
+      border: 1px solid var(--hairline);
       color: var(--text);
-      padding: 0.65rem 0.85rem;
-      border-radius: 10px;
-      font-size: 0.9rem;
+      padding: 0 12px;
+      border-radius: 8px;
+      font-family: inherit;
+      font-size: 13px;
+      line-height: 20px;
       outline: none;
-      transition: border-color 0.15s, box-shadow 0.15s;
+      transition: border-color 120ms var(--ease);
     }
 
     .input-with-toggle input {
-      padding-right: 3.6rem;
+      padding-right: 56px;
     }
 
     input[type="text"]:focus,
     input[type="password"]:focus,
     select:focus {
       border-color: var(--accent);
-      box-shadow: 0 0 0 3px rgba(124, 92, 255, 0.15);
     }
 
     .eye-btn {
       position: absolute;
-      right: 0.5rem;
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid var(--border);
-      color: var(--muted);
-      border-radius: 6px;
-      padding: 0.22rem 0.5rem;
-      font-size: 0.73rem;
-      font-weight: 600;
+      right: 6px;
+      height: 24px;
+      background: var(--raised);
+      border: 1px solid var(--hairline);
+      color: var(--text-secondary);
+      border-radius: 4px;
+      padding: 0 8px;
+      font-size: 12px;
+      line-height: 16px;
+      font-weight: 400;
       cursor: pointer;
+      transition: color 120ms var(--ease);
     }
 
     .eye-btn:hover {
       color: var(--text);
-      background: rgba(255, 255, 255, 0.1);
     }
 
     .ai-details {
-      transition: opacity 0.2s ease;
+      transition: opacity 150ms var(--ease);
     }
 
     .ai-details.disabled {
-      opacity: 0.45;
+      opacity: 0.4;
     }
 
     /* Switch rows */
     .switch-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 0.85rem;
+      gap: 12px;
     }
 
     @media (max-width: 640px) {
@@ -504,383 +628,431 @@ export function renderConfigurePage(config: AddonConfig, baseUrl: string): strin
     .switch-card {
       display: flex;
       align-items: flex-start;
-      gap: 0.75rem;
-      padding: 0.9rem 1rem;
-      background: rgba(9, 12, 21, 0.55);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-md);
+      gap: 12px;
+      padding: 16px;
+      background: var(--bg);
+      border: 1px solid var(--hairline);
+      border-radius: 8px;
       cursor: pointer;
-      transition: border-color 0.15s;
+      transition: border-color 120ms var(--ease), background-color 120ms var(--ease);
     }
 
     .switch-card:hover {
-      border-color: var(--border-strong);
+      border-color: var(--hairline-strong);
     }
 
     .switch-card input[type="checkbox"] {
       accent-color: var(--accent);
-      width: 17px;
-      height: 17px;
-      margin-top: 0.18rem;
+      width: 16px;
+      height: 16px;
+      margin: 2px 0 0;
       cursor: pointer;
       flex-shrink: 0;
     }
 
     .switch-title {
-      font-size: 0.9rem;
-      font-weight: 600;
+      font-size: 14px;
+      line-height: 20px;
+      font-weight: 500;
       color: var(--text);
-      margin-bottom: 0.18rem;
+      margin-bottom: 4px;
     }
 
     .switch-sub {
-      font-size: 0.8rem;
-      color: var(--muted);
+      font-size: 13px;
+      line-height: 20px;
+      color: var(--text-secondary);
     }
 
-    /* Install Card */
+    /* Sticky Install Panel */
     .install-card {
-      background: linear-gradient(180deg, rgba(25, 31, 52, 0.95) 0%, rgba(15, 19, 32, 0.98) 100%);
-      border: 1px solid rgba(124, 92, 255, 0.4);
-      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5), 0 0 35px rgba(124, 92, 255, 0.12);
+      position: sticky;
+      top: 24px;
+      background: var(--card);
+      border: 1px solid var(--hairline-strong);
     }
 
     .summary-bar {
       display: flex;
-      flex-wrap: wrap;
-      gap: 0.5rem;
-      margin-bottom: 1rem;
+      flex-direction: column;
+      gap: 8px;
+      padding: 12px 0;
+      border-top: 1px solid var(--hairline);
+      border-bottom: 1px solid var(--hairline);
+      margin-bottom: 16px;
     }
 
     .summary-item {
-      font-size: 0.78rem;
-      padding: 0.28rem 0.65rem;
-      border-radius: 8px;
-      background: rgba(255, 255, 255, 0.04);
-      border: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      font-size: 13px;
+      line-height: 20px;
       color: var(--text-secondary);
     }
 
     .summary-item strong {
-      color: #fff;
+      color: var(--text);
+      font-weight: 500;
+      text-align: right;
     }
 
     .url-box {
-      background: #06080f;
-      border: 1px solid var(--border);
-      padding: 0.75rem 0.95rem;
-      border-radius: 10px;
+      background: var(--bg-deep);
+      border: 1px solid var(--hairline);
+      padding: 12px;
+      border-radius: 8px;
       font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-      font-size: 0.8rem;
+      font-size: 12px;
+      line-height: 16px;
       word-break: break-all;
-      color: var(--teal);
-      margin-bottom: 1rem;
-      max-height: 76px;
+      color: var(--text-secondary);
+      margin-bottom: 16px;
+      max-height: 72px;
       overflow-y: auto;
     }
 
     .actions {
       display: flex;
-      gap: 0.75rem;
-      flex-wrap: wrap;
+      flex-direction: column;
+      gap: 8px;
     }
 
     .btn {
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      gap: 0.5rem;
-      padding: 0.82rem 1.4rem;
-      border-radius: 11px;
-      font-weight: 600;
-      font-size: 0.95rem;
+      height: 44px;
+      gap: 8px;
+      padding: 0 16px;
+      border-radius: 8px;
+      font-weight: 500;
+      font-size: 14px;
+      line-height: 20px;
       text-decoration: none;
       cursor: pointer;
       border: 1px solid transparent;
-      transition: all 0.15s ease;
+      transition: background-color 120ms var(--ease), border-color 120ms var(--ease), transform 120ms var(--ease);
+    }
+
+    .btn:active {
+      transform: scale(0.98);
     }
 
     .btn-primary {
-      background: linear-gradient(135deg, var(--accent) 0%, #5f3dc4 100%);
-      color: #fff;
-      flex: 1.5;
-      min-width: 200px;
-      box-shadow: 0 8px 24px var(--accent-glow);
+      background: var(--text);
+      color: var(--bg);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25);
     }
 
     .btn-primary:hover {
-      transform: translateY(-1px);
-      box-shadow: 0 12px 28px rgba(124, 92, 255, 0.48);
+      background: #ffffff;
     }
 
     .btn-secondary {
-      background: rgba(255, 255, 255, 0.06);
-      border-color: var(--border-strong);
+      height: 36px;
+      background: var(--raised);
+      border-color: var(--hairline);
       color: var(--text);
-      flex: 1;
-      min-width: 150px;
+      font-size: 13px;
     }
 
     .btn-secondary:hover {
-      background: rgba(255, 255, 255, 0.11);
+      border-color: var(--hairline-strong);
     }
 
     .coffee-footer {
-      margin-top: 2rem;
-      text-align: center;
+      margin-top: 48px;
+      padding-top: 24px;
+      border-top: 1px solid var(--hairline);
       display: flex;
-      flex-direction: column;
       align-items: center;
-      gap: 0.6rem;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 16px;
       color: var(--muted);
-      font-size: 0.84rem;
+      font-size: 13px;
+      line-height: 20px;
     }
 
     .coffee-btn {
       display: inline-flex;
       align-items: center;
-      gap: 0.55rem;
-      padding: 0.62rem 1.2rem;
-      border-radius: 999px;
-      background: linear-gradient(135deg, rgba(255, 221, 0, 0.14), rgba(245, 158, 11, 0.1));
-      border: 1px solid rgba(255, 221, 0, 0.35);
-      color: #fde68a;
-      font-weight: 600;
-      font-size: 0.88rem;
+      height: 32px;
+      gap: 8px;
+      padding: 0 12px;
+      border-radius: 6px;
+      background: var(--card);
+      border: 1px solid var(--hairline);
+      color: var(--text-secondary);
+      font-weight: 400;
+      font-size: 13px;
       text-decoration: none;
-      transition: all 0.15s ease;
+      transition: border-color 120ms var(--ease), color 120ms var(--ease);
     }
 
     .coffee-btn:hover {
-      background: linear-gradient(135deg, rgba(255, 221, 0, 0.22), rgba(245, 158, 11, 0.18));
-      border-color: rgba(255, 221, 0, 0.6);
-      transform: translateY(-1px);
-      color: #fff;
+      border-color: var(--hairline-strong);
+      color: var(--text);
     }
   </style>
 </head>
 <body>
-  <div class="container">
-    <header class="hero">
-      <div class="hero-title-row">
-        <img class="hero-logo" src="/logo.svg" alt="RosettaSubs Logo" width="52" height="52" />
-        <h1>RosettaSubs</h1>
+  <div class="shell">
+    <nav class="topbar">
+      <div class="hero-title-row brand">
+        <img class="hero-logo" src="/logo.svg" alt="RosettaSubs Logo" width="28" height="28" />
+        <span class="brand-name">RosettaSubs</span>
       </div>
-      <p class="subtitle">Subtitles in 30+ languages from OpenSubtitles, SubDL, and Wyzie — with dual-language immersion tracks and instant AI translation when subtitles are missing in your language.</p>
-      <div class="trust-strip">
-        <span class="trust-pill"><span class="trust-dot"></span> Stateless &amp; Zero-Storage</span>
-        <span class="trust-pill"><span class="trust-dot"></span> Dual-Language Immersion</span>
-        <span class="trust-pill"><span class="trust-dot"></span> Auto UTF-8 &amp; SRT Normalization</span>
-        <span class="trust-pill"><span class="trust-dot"></span> MovieHash Sync</span>
+      <div class="topbar-meta">
+        <span>org.stremio.rosettasubs</span>
+        <a class="topbar-link" href="${supportUrl}" target="_blank" rel="noopener noreferrer">Sponsor</a>
+      </div>
+    </nav>
+
+    <header class="hero">
+      <div class="hero-copy">
+        <h1>Subtitles for every release, in one track or two</h1>
+        <p class="subtitle">Subtitles in 30+ languages from OpenSubtitles, SubDL, and Wyzie — with dual-language immersion tracks and instant AI translation when subtitles are missing in your language</p>
+        <div class="hero-specs">
+          <span class="hero-spec-item"><span class="spec-dot"></span>MovieHash sync</span>
+          <span class="hero-spec-item">UTF-8 SubRip normalization</span>
+          <span class="hero-spec-item">Dual-language cue alignment</span>
+        </div>
+      </div>
+
+      <div class="cinema-stage" aria-label="Subtitle cue preview">
+        <div class="cinema-bar">
+          <span id="previewTrackLabel">JA + EN • Dual track</span>
+          <span>00:42:18,400 --&gt; 00:42:21,150</span>
+        </div>
+        <div class="cinema-screen">
+          <div class="cinema-scene-meta">
+            <span>23.976 fps • UTF-8 SRT</span>
+            <span id="previewModeBadge">Dual immersion</span>
+          </div>
+          <div class="cinema-cue-box">
+            <div class="cinema-line-primary">
+              <span id="previewPrimaryText">目が覚めたか、ネオ</span><span id="previewIdiomNote" class="cinema-line-note">[目が覚める: wake up to reality]</span>
+            </div>
+            <div id="previewSecondaryText" class="cinema-line-secondary">Wake up, Neo</div>
+          </div>
+        </div>
       </div>
     </header>
 
-    <!-- STEP 1: LANGUAGES -->
-    <div class="card">
-      <div class="card-header">
-        <div>
-          <h2 class="step-title"><span class="step-num">1</span> Subtitle Languages</h2>
-          <p class="hint">Pick the languages you want to appear in Stremio's subtitle menu.</p>
+    <div class="workspace">
+      <div class="steps-col">
+        <!-- STEP 1: LANGUAGES -->
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h2 class="step-title"><span class="step-num">01</span> Subtitle languages</h2>
+              <p class="hint">Select the languages to list in Stremio's player menu</p>
+            </div>
+            <span id="langCountBadge" class="badge-count">1 selected</span>
+          </div>
+
+          <div id="selectedChips" class="selected-chips"></div>
+          <div id="langGrid" class="lang-grid"></div>
         </div>
-        <span id="langCountBadge" class="badge-count">1 selected</span>
-      </div>
 
-      <div id="selectedChips" class="selected-chips"></div>
+        <!-- STEP 2: PROVIDERS -->
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h2 class="step-title"><span class="step-num">02</span> Subtitle sources</h2>
+              <p class="hint">Queried in parallel and ranked by video hash and release group</p>
+            </div>
+          </div>
 
-      <div id="langGrid" class="lang-grid"></div>
-    </div>
+          <div class="provider-stack">
+            <div id="cardWyzie" class="provider-card">
+              <div class="provider-top">
+                <label class="provider-label">
+                  <input type="checkbox" id="provWyzie" />
+                  <span>Wyzie &amp; Stremio OpenSubtitles v3</span>
+                </label>
+                <span class="tag tag-free">No key required</span>
+              </div>
+              <p class="provider-desc">Zero-config lookup across Wyzie archives and Stremio's OpenSubtitles v3 mirror</p>
+            </div>
 
-    <!-- STEP 2: PROVIDERS -->
-    <div class="card">
-      <div class="card-header">
-        <div>
-          <h2 class="step-title"><span class="step-num">2</span> Subtitle Sources</h2>
-          <p class="hint">All enabled sources are queried in parallel and deduplicated by release/hash score.</p>
+            <div id="cardOs" class="provider-card">
+              <div class="provider-top">
+                <label class="provider-label">
+                  <input type="checkbox" id="provOs" />
+                  <span>OpenSubtitles REST API v1</span>
+                </label>
+                <div style="display:flex;align-items:center;gap:12px;">
+                  <span class="tag">Optional key</span>
+                  <a class="ext-link" href="https://www.opensubtitles.com/en/consumers" target="_blank" rel="noopener noreferrer">Get key &nearr;</a>
+                </div>
+              </div>
+              <p class="provider-desc">Direct OpenSubtitles.com REST queries with exact video hash matching</p>
+              <div class="provider-key-row">
+                <div class="input-with-toggle">
+                  <input type="password" id="osKey" placeholder="OpenSubtitles API key" autocomplete="off" />
+                  <button type="button" class="eye-btn" data-target="osKey">Show</button>
+                </div>
+              </div>
+            </div>
+
+            <div id="cardSubdl" class="provider-card">
+              <div class="provider-top">
+                <label class="provider-label">
+                  <input type="checkbox" id="provSubdl" />
+                  <span>SubDL API</span>
+                </label>
+                <div style="display:flex;align-items:center;gap:12px;">
+                  <span class="tag">Optional key</span>
+                  <a class="ext-link" href="https://subdl.com/panel/api" target="_blank" rel="noopener noreferrer">Get key &nearr;</a>
+                </div>
+              </div>
+              <p class="provider-desc">Movie and TV season pack archive with automatic ZIP episode extraction</p>
+              <div class="provider-key-row">
+                <div class="input-with-toggle">
+                  <input type="password" id="subdlKey" placeholder="SubDL API key" autocomplete="off" />
+                  <button type="button" class="eye-btn" data-target="subdlKey">Show</button>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
 
-      <div class="provider-stack">
-        <div id="cardWyzie" class="provider-card">
-          <div class="provider-top">
-            <label class="provider-label">
-              <input type="checkbox" id="provWyzie" />
-              <span>Wyzie &amp; Stremio OpenSubtitles v3</span>
+        <!-- STEP 3: MULTIMODAL AI -->
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h2 class="step-title"><span class="step-num">03</span> AI translation fallback</h2>
+              <p class="hint">Translates the best available subtitle track on the fly when your language is missing</p>
+            </div>
+          </div>
+
+          <div class="field-grid">
+            <label class="field">
+              <span>Translation trigger</span>
+              <select id="aiMode">
+                <option value="fallback">Fallback only when native subtitles are missing</option>
+                <option value="always">Always include an AI-translated track</option>
+                <option value="off">Off</option>
+              </select>
             </label>
-            <span class="tag tag-free">Built-in &bull; No Key Required</span>
-          </div>
-          <p class="provider-desc">Instant zero-config subtitle lookup across community archives and Stremio's official OpenSubtitles v3 mirror.</p>
-        </div>
 
-        <div id="cardOs" class="provider-card">
-          <div class="provider-top">
-            <label class="provider-label">
-              <input type="checkbox" id="provOs" />
-              <span>OpenSubtitles REST API v1</span>
+            <label class="field">
+              <span>AI provider</span>
+              <select id="aiProvider">
+                <option value="gemini">Google Gemini</option>
+                <option value="openai">OpenAI compatible</option>
+              </select>
             </label>
-            <div style="display:flex;align-items:center;gap:0.6rem;">
-              <span class="tag tag-key">Optional Key</span>
-              <a class="ext-link" href="https://www.opensubtitles.com/en/consumers" target="_blank" rel="noopener noreferrer">Get free key &nearr;</a>
-            </div>
           </div>
-          <p class="provider-desc">Queries the official OpenSubtitles.com REST API with exact video hash matching and regional language codes.</p>
-          <div class="provider-key-row">
-            <div class="input-with-toggle">
-              <input type="password" id="osKey" placeholder="Paste your OpenSubtitles API Key..." autocomplete="off" />
-              <button type="button" class="eye-btn" data-target="osKey">Show</button>
-            </div>
-          </div>
-        </div>
 
-        <div id="cardSubdl" class="provider-card">
-          <div class="provider-top">
-            <label class="provider-label">
-              <input type="checkbox" id="provSubdl" />
-              <span>SubDL API</span>
+          <div id="aiDetails" class="field-grid ai-details">
+            <label class="field">
+              <div class="field-label-row">
+                <span>Provider API key</span>
+                <a id="aiKeyHelpLink" class="ext-link" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer">Get Gemini key &nearr;</a>
+              </div>
+              <div class="input-with-toggle">
+                <input type="password" id="aiApiKey" placeholder="API key" autocomplete="off" />
+                <button type="button" class="eye-btn" data-target="aiApiKey">Show</button>
+              </div>
             </label>
-            <div style="display:flex;align-items:center;gap:0.6rem;">
-              <span class="tag tag-key">Optional Key</span>
-              <a class="ext-link" href="https://subdl.com/panel/api" target="_blank" rel="noopener noreferrer">Get free key &nearr;</a>
+
+            <label class="field">
+              <span>Model override</span>
+              <input type="text" id="aiModel" placeholder="gemini-2.0-flash" />
+            </label>
+          </div>
+        </div>
+
+        <!-- STEP 4: PLAYBACK & FORMATTING -->
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h2 class="step-title"><span class="step-num">04</span> Formatting &amp; immersion</h2>
+              <p class="hint">Encoding normalization, hearing-impaired filtering, and dual-language cue stacking</p>
             </div>
           </div>
-          <p class="provider-desc">High-coverage movie and TV season pack archive with automatic ZIP episode extraction.</p>
-          <div class="provider-key-row">
-            <div class="input-with-toggle">
-              <input type="password" id="subdlKey" placeholder="Paste your SubDL API Key..." autocomplete="off" />
-              <button type="button" class="eye-btn" data-target="subdlKey">Show</button>
-            </div>
+
+          <div class="switch-grid">
+            <label class="switch-card">
+              <input type="checkbox" id="proxySubtitles" />
+              <div>
+                <div class="switch-title">Normalize to UTF-8 SRT</div>
+                <div class="switch-sub">Converts legacy encodings and VTT, ASS, or ZIP archives into UTF-8 SubRip</div>
+              </div>
+            </label>
+
+            <label class="switch-card">
+              <input type="checkbox" id="includeHi" />
+              <div>
+                <div class="switch-title">Include hearing impaired</div>
+                <div class="switch-sub">Keep tracks with sound descriptions and speaker labels</div>
+              </div>
+            </label>
+
+            <label class="switch-card">
+              <input type="checkbox" id="dualSubtitles" />
+              <div>
+                <div class="switch-title">Dual-language immersion</div>
+                <div class="switch-sub">Stacks target language on top with your reference language below</div>
+              </div>
+            </label>
+
+            <label class="switch-card">
+              <input type="checkbox" id="dualSubtitlesAnnotate" />
+              <div>
+                <div class="switch-title">Inline B2/C1 idiom notes</div>
+                <div class="switch-sub">Appends brief bracketed meanings for non-literal slang on dual tracks</div>
+              </div>
+            </label>
+          </div>
+
+          <div id="dualDetails" class="field-grid ai-details">
+            <label class="field">
+              <span>Reference language (bottom line)</span>
+              <select id="dualSubtitlesNativeLang"></select>
+            </label>
           </div>
         </div>
       </div>
-    </div>
 
-    <!-- STEP 3: MULTIMODAL AI -->
-    <div class="card">
-      <div class="card-header">
-        <div>
-          <h2 class="step-title"><span class="step-num">3</span> AI Translation Fallback</h2>
-          <p class="hint">When a stream has no subtitles in your language, RosettaSubs translates the best available track on the fly while preserving exact timestamps.</p>
+      <!-- STEP 5: INSTALL -->
+      <div class="card install-card">
+        <div class="card-header" style="margin-bottom:12px;">
+          <div>
+            <h2 class="step-title"><span class="step-num">05</span> Install add-on</h2>
+            <p class="hint">Stateless manifest URL encoded with your settings</p>
+          </div>
         </div>
-      </div>
 
-      <div class="field-grid">
-        <label class="field">
-          <span>Translation Trigger</span>
-          <select id="aiMode">
-            <option value="fallback">Smart Fallback (only when native subtitles are missing)</option>
-            <option value="always">Always include an AI-translated subtitle option</option>
-            <option value="off">Off (disable AI translation)</option>
-          </select>
-        </label>
+        <div id="summaryBar" class="summary-bar"></div>
+        <div id="manifestUrlBox" class="url-box"></div>
 
-        <label class="field">
-          <span>AI Engine</span>
-          <select id="aiProvider">
-            <option value="gemini">Google Gemini (Fast Parallel Flash)</option>
-            <option value="openai">OpenAI / Compatible API</option>
-          </select>
-        </label>
-      </div>
-
-      <div id="aiDetails" class="field-grid ai-details">
-        <label class="field">
-          <div class="field-label-row">
-            <span>AI Provider API Key</span>
-            <a id="aiKeyHelpLink" class="ext-link" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer">Get Gemini key &nearr;</a>
-          </div>
-          <div class="input-with-toggle">
-            <input type="password" id="aiApiKey" placeholder="Paste your Gemini or OpenAI API key..." autocomplete="off" />
-            <button type="button" class="eye-btn" data-target="aiApiKey">Show</button>
-          </div>
-        </label>
-
-        <label class="field">
-          <span>Model Override <span style="color:var(--muted);font-weight:400;">(Optional)</span></span>
-          <input type="text" id="aiModel" placeholder="Default: gemini-2.0-flash" />
-        </label>
-      </div>
-    </div>
-
-    <!-- STEP 4: PLAYBACK & FORMATTING -->
-    <div class="card">
-      <div class="card-header">
-        <div>
-          <h2 class="step-title"><span class="step-num">4</span> Formatting &amp; Accessibility</h2>
-          <p class="hint">Prevent broken accents, garbled characters, and unsupported subtitle formats in Stremio's player.</p>
+        <div class="actions">
+          <a id="installBtn" class="btn btn-primary" href="#">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="5 3 19 12 5 21 5 3"></polygon>
+            </svg>
+            <span>Install in Stremio</span>
+          </a>
+          <a id="webInstallBtn" class="btn btn-secondary" href="#" target="_blank" rel="noopener noreferrer">Open in Stremio Web</a>
+          <button id="copyBtn" class="btn btn-secondary" type="button">Copy manifest URL</button>
         </div>
-      </div>
-
-      <div class="switch-grid">
-        <label class="switch-card">
-          <input type="checkbox" id="proxySubtitles" />
-          <div>
-            <div class="switch-title">Normalize to UTF-8 SRT</div>
-            <div class="switch-sub">Converts Windows-1252/Latin1/UTF-16 &amp; VTT/ASS/ZIP archives into clean UTF-8 SubRip files.</div>
-          </div>
-        </label>
-
-        <label class="switch-card">
-          <input type="checkbox" id="includeHi" />
-          <div>
-            <div class="switch-title">Include Hearing Impaired (HI)</div>
-            <div class="switch-sub">Keep subtitle tracks that include sound-effect descriptions and speaker cues.</div>
-          </div>
-        </label>
-
-        <label class="switch-card">
-          <input type="checkbox" id="dualSubtitles" />
-          <div>
-            <div class="switch-title">Dual-Language Immersion Subtitles</div>
-            <div class="switch-sub">Timestamp-aligns target language on top with your native reference language below.</div>
-          </div>
-        </label>
-
-        <label class="switch-card">
-          <input type="checkbox" id="dualSubtitlesAnnotate" />
-          <div>
-            <div class="switch-title">Inline B2/C1 Idiom Annotations</div>
-            <div class="switch-sub">Uses AI to append concise inline notes for non-literal slang or idioms on dual tracks.</div>
-          </div>
-        </label>
-      </div>
-
-      <div id="dualDetails" class="field-grid ai-details" style="margin-top:0.85rem;">
-        <label class="field">
-          <span>Native Reference Language (Bottom Line)</span>
-          <select id="dualSubtitlesNativeLang"></select>
-        </label>
-      </div>
-    </div>
-
-    <!-- STEP 5: INSTALL -->
-    <div class="card install-card">
-      <div class="card-header" style="margin-bottom:0.75rem;">
-        <div>
-          <h2 class="step-title"><span class="step-num">5</span> Install in Stremio</h2>
-          <p class="hint">Your configuration is encoded directly into your personal install link below.</p>
-        </div>
-      </div>
-
-      <div id="summaryBar" class="summary-bar"></div>
-      <div id="manifestUrlBox" class="url-box"></div>
-
-      <div class="actions">
-        <a id="installBtn" class="btn btn-primary" href="#">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
-            <polygon points="5 3 19 12 5 21 5 3"></polygon>
-          </svg>
-          <span>Install in Stremio App</span>
-        </a>
-        <a id="webInstallBtn" class="btn btn-secondary" href="#" target="_blank" rel="noopener noreferrer">Open in Stremio Web</a>
-        <button id="copyBtn" class="btn btn-secondary" type="button">Copy Manifest URL</button>
       </div>
     </div>
 
     <footer class="coffee-footer">
+      <span>RosettaSubs • Open-source Stremio subtitle add-on</span>
       <a class="coffee-btn" href="${supportUrl}" target="_blank" rel="noopener noreferrer">
-        <span>&#9749;</span>
-        <span>Buy me a coffee</span>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M17 8h1a4 4 0 1 1 0 8h-1"></path>
+          <path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z"></path>
+        </svg>
+        <span>Support development</span>
       </a>
-      <span>Open-source &bull; Built for the Stremio community</span>
     </footer>
   </div>
 
@@ -888,6 +1060,18 @@ export function renderConfigurePage(config: AddonConfig, baseUrl: string): strin
     const INITIAL_CONFIG = ${initialConfigJson};
     const LANGUAGES = ${languagesJson};
     const BASE_URL = ${JSON.stringify(baseUrl.replace(/\/+$/, ''))} || window.location.origin;
+
+    const SAMPLE_LINES = {
+      jpn: { text: '目が覚めたか、ネオ', note: '[目が覚める: wake up to reality]' },
+      spa: { text: 'No manches, despierta ya', note: '[no manches: no way]' },
+      fre: { text: 'Tu racontes des salades, Néo', note: '[raconter des salades: spin tales]' },
+      ger: { text: 'Mach mir nichts vor, Neo', note: '[vormachen: fool someone]' },
+      pob: { text: 'Acorda pra vida, Neo', note: '[acordar pra vida: get real]' },
+      por: { text: 'Acorda para a vida, Neo', note: '[acordar: wake up]' },
+      ita: { text: 'Apri gli occhi, Neo', note: '[aprire gli occhi: face facts]' },
+      kor: { text: '정신 차려, 네오', note: '[정신 차리다: come to your senses]' },
+      eng: { text: 'Wake up, Neo', note: '[wake up: see what is real]' }
+    };
 
     const langGrid = document.getElementById('langGrid');
     const selectedChips = document.getElementById('selectedChips');
@@ -958,7 +1142,7 @@ export function renderConfigurePage(config: AddonConfig, baseUrl: string): strin
 
       const codeSpan = document.createElement('span');
       codeSpan.className = 'pill-code';
-      codeSpan.textContent = lang.iso639_2;
+      codeSpan.textContent = lang.iso639_2.toUpperCase();
 
       left.appendChild(cb);
       left.appendChild(nameSpan);
@@ -1005,7 +1189,6 @@ export function renderConfigurePage(config: AddonConfig, baseUrl: string): strin
     dualSubtitlesNativeLang.value = INITIAL_CONFIG.dualSubtitlesNativeLang || 'eng';
     dualSubtitlesAnnotate.checked = Boolean(INITIAL_CONFIG.dualSubtitlesAnnotate);
 
-    // Auto-enable provider checkbox when user enters an API key
     osKey.addEventListener('input', () => {
       if (osKey.value.trim()) provOs.checked = true;
       updateLinks();
@@ -1015,7 +1198,6 @@ export function renderConfigurePage(config: AddonConfig, baseUrl: string): strin
       updateLinks();
     });
 
-    // Show/Hide password buttons
     document.querySelectorAll('.eye-btn').forEach((btn) => {
       btn.addEventListener('click', () => {
         const input = document.getElementById(btn.dataset.target);
@@ -1078,22 +1260,41 @@ export function renderConfigurePage(config: AddonConfig, baseUrl: string): strin
       if (cfg.aiProvider === 'openai') {
         aiKeyHelpLink.href = 'https://platform.openai.com/api-keys';
         aiKeyHelpLink.innerHTML = 'Get OpenAI key &nearr;';
-        aiModel.placeholder = 'Default: gpt-4o-mini';
+        aiModel.placeholder = 'gpt-4o-mini';
       } else {
         aiKeyHelpLink.href = 'https://aistudio.google.com/apikey';
         aiKeyHelpLink.innerHTML = 'Get Gemini key &nearr;';
-        aiModel.placeholder = 'Default: gemini-2.0-flash';
+        aiModel.placeholder = 'gemini-2.0-flash';
       }
+
+      // Update live cinema preview
+      const nativeCode = cfg.dualSubtitlesNativeLang || 'eng';
+      const primaryCode = cfg.languages.find((l) => l !== nativeCode) || cfg.languages[0] || 'jpn';
+      const sample = SAMPLE_LINES[primaryCode] || SAMPLE_LINES.jpn;
+      const refSample = SAMPLE_LINES[nativeCode] || SAMPLE_LINES.eng;
+      document.getElementById('previewPrimaryText').textContent = sample.text;
+      const idiomEl = document.getElementById('previewIdiomNote');
+      idiomEl.textContent = sample.note;
+      idiomEl.style.display = cfg.dualSubtitles && cfg.dualSubtitlesAnnotate ? 'inline' : 'none';
+      const secEl = document.getElementById('previewSecondaryText');
+      secEl.textContent = refSample.text;
+      secEl.style.display = cfg.dualSubtitles ? 'block' : 'none';
+      document.getElementById('previewTrackLabel').textContent = cfg.dualSubtitles
+        ? primaryCode.toUpperCase() + ' + ' + nativeCode.toUpperCase() + ' • Dual track'
+        : primaryCode.toUpperCase() + ' • Single track';
+      document.getElementById('previewModeBadge').textContent = cfg.dualSubtitles
+        ? 'Dual immersion'
+        : 'Standard SRT';
 
       const langNames = cfg.languages.map((c) => (langByCode.get(c) ? langByCode.get(c).name : c)).join(', ');
       const aiSummary = cfg.aiMode === 'off' ? 'Off' : (cfg.aiProvider === 'openai' ? 'OpenAI' : 'Gemini') + ' (' + cfg.aiMode + ')';
       const dualSummary = cfg.dualSubtitles
-        ? '<span class="summary-item"><strong>Dual Subs:</strong> ' + (langByCode.get(cfg.dualSubtitlesNativeLang) ? langByCode.get(cfg.dualSubtitlesNativeLang).name : cfg.dualSubtitlesNativeLang) + '</span>'
+        ? '<div class="summary-item"><span>Dual reference</span><strong>' + (langByCode.get(cfg.dualSubtitlesNativeLang) ? langByCode.get(cfg.dualSubtitlesNativeLang).name : cfg.dualSubtitlesNativeLang) + '</strong></div>'
         : '';
       summaryBar.innerHTML =
-        '<span class="summary-item"><strong>Languages:</strong> ' + langNames + '</span>' +
-        '<span class="summary-item"><strong>Sources:</strong> ' + cfg.providers.length + ' active</span>' +
-        '<span class="summary-item"><strong>AI Translation:</strong> ' + aiSummary + '</span>' +
+        '<div class="summary-item"><span>Languages</span><strong>' + langNames + '</strong></div>' +
+        '<div class="summary-item"><span>Sources</span><strong>' + cfg.providers.length + ' active</strong></div>' +
+        '<div class="summary-item"><span>AI fallback</span><strong>' + aiSummary + '</strong></div>' +
         dualSummary;
     }
 
@@ -1117,8 +1318,8 @@ export function renderConfigurePage(config: AddonConfig, baseUrl: string): strin
       const text = document.getElementById('manifestUrlBox').textContent;
       await navigator.clipboard.writeText(text);
       const btn = document.getElementById('copyBtn');
-      btn.textContent = 'Copied!';
-      setTimeout(() => (btn.textContent = 'Copy Manifest URL'), 1500);
+      btn.textContent = 'Copied';
+      setTimeout(() => (btn.textContent = 'Copy manifest URL'), 1500);
     });
 
     updateLinks();

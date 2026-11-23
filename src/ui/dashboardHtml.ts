@@ -5,170 +5,350 @@ export function renderDashboardPage(): string {
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="icon" type="image/svg+xml" href="/logo.svg" />
-  <title>RosettaSubs — Private Observability</title>
+  <title>RosettaSubs — Observability</title>
   <style>
     :root {
-      --bg: #07090f;
-      --card: rgba(18, 23, 38, 0.9);
-      --border: rgba(255, 255, 255, 0.08);
-      --accent: #7c5cff;
-      --teal: #2dd4bf;
-      --amber: #f59e0b;
-      --danger: #ef4444;
-      --text: #f3f5fb;
-      --muted: #8590ad;
+      --bg-deep: #0f0f10;
+      --bg: #141415;
+      --card: #19191b;
+      --raised: #232325;
+      --bar-neutral: #2c2c30;
+      --hairline: rgba(237, 237, 237, 0.08);
+      --text: #ededed;
+      --text-secondary: #a1a1a6;
+      --muted: #85858b;
+      --accent: #e5a93c;
+      --positive: #4cc38a;
+      --negative: #e5484d;
+      --ease: cubic-bezier(0.22, 1, 0.36, 1);
     }
-    * { box-sizing: border-box; }
+
+    * {
+      box-sizing: border-box;
+    }
+
     body {
       margin: 0;
       font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       background: var(--bg);
       color: var(--text);
-      padding: 1.5rem 1.25rem 3rem;
+      font-size: 14px;
+      line-height: 20px;
+      font-weight: 400;
+      padding: 0 32px 48px;
+      -webkit-font-smoothing: antialiased;
     }
-    .container { max-width: 1180px; margin: 0 auto; }
-    header {
+
+    .container {
+      max-width: 1480px;
+      margin: 0 auto;
+    }
+
+    header.topbar {
+      height: 64px;
       display: flex;
       align-items: center;
       justify-content: space-between;
       flex-wrap: wrap;
-      gap: 1rem;
-      margin-bottom: 1.5rem;
+      gap: 16px;
+      border-bottom: 1px solid var(--hairline);
+      margin-bottom: 24px;
     }
-    .title-row { display: flex; align-items: center; gap: 0.75rem; }
-    .title-row img { width: 40px; height: 40px; border-radius: 10px; }
-    h1 { margin: 0; font-size: 1.45rem; font-weight: 800; }
-    .badge-private {
-      font-size: 0.72rem;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      padding: 0.25rem 0.6rem;
-      border-radius: 999px;
-      background: rgba(45, 212, 191, 0.14);
-      border: 1px solid rgba(45, 212, 191, 0.38);
-      color: var(--teal);
+
+    .title-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
     }
-    .meta-status { font-size: 0.82rem; color: var(--muted); font-family: ui-monospace, monospace; }
+
+    .title-row img {
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 16px;
+      line-height: 20px;
+      font-weight: 500;
+      color: var(--text);
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--positive);
+      display: inline-block;
+    }
+
+    .meta-status {
+      font-size: 12px;
+      line-height: 16px;
+      color: var(--muted);
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* 4 Compact Stat Cards (Numbers Only) */
     .kpi-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-      gap: 1rem;
-      margin-bottom: 1.25rem;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin-bottom: 24px;
     }
+
+    @media (max-width: 960px) {
+      .kpi-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+
+    @media (max-width: 560px) {
+      .kpi-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
     .card {
       background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      padding: 1.15rem 1.25rem;
+      border: 1px solid var(--hairline);
+      border-radius: 12px;
+      padding: 20px;
     }
-    .kpi-label { font-size: 0.78rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
-    .kpi-value { font-size: 1.85rem; font-weight: 800; margin: 0.25rem 0; color: #fff; }
-    .kpi-sub { font-size: 0.8rem; color: var(--muted); }
-    .kpi-sub strong { color: var(--teal); }
-    .grid-2 {
+
+    .kpi-label {
+      font-size: 13px;
+      line-height: 20px;
+      color: var(--text-secondary);
+      font-weight: 400;
+    }
+
+    .kpi-value {
+      font-size: 28px;
+      line-height: 32px;
+      font-weight: 500;
+      margin: 8px 0;
+      color: var(--text);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .kpi-sub {
+      font-size: 12px;
+      line-height: 16px;
+      color: var(--muted);
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .kpi-sub strong {
+      color: var(--text-secondary);
+      font-weight: 500;
+    }
+
+    /* Main Chart (2/3) + Route Table (1/3) */
+    .main-grid {
       display: grid;
-      grid-template-columns: 1.6fr 1fr;
-      gap: 1rem;
-      margin-bottom: 1.25rem;
+      grid-template-columns: 2fr 1fr;
+      gap: 16px;
+      margin-bottom: 24px;
     }
-    .grid-3 {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-      gap: 1rem;
-      margin-bottom: 1.25rem;
+
+    @media (max-width: 1024px) {
+      .main-grid {
+        grid-template-columns: 1fr;
+      }
     }
-    @media (max-width: 860px) {
-      .grid-2 { grid-template-columns: 1fr; }
+
+    h2 {
+      margin: 0 0 16px;
+      font-size: 14px;
+      line-height: 20px;
+      font-weight: 500;
+      color: var(--text);
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
     }
-    h2 { margin: 0 0 0.85rem; font-size: 0.98rem; font-weight: 700; color: #dce2f2; display: flex; justify-content: space-between; align-items: center; }
+
     .bars {
       display: flex;
       align-items: flex-end;
-      gap: 3px;
-      height: 120px;
-      padding-top: 12px;
-      border-bottom: 1px solid var(--border);
+      gap: 4px;
+      height: 280px;
+      padding-top: 16px;
+      border-bottom: 1px solid var(--hairline);
+      background-image: linear-gradient(to bottom, var(--hairline) 1px, transparent 1px);
+      background-size: 100% 70px;
     }
+
     .bar-col {
       flex: 1;
       min-width: 4px;
-      background: linear-gradient(180deg, var(--accent), var(--teal));
-      border-radius: 3px 3px 0 0;
-      opacity: 0.85;
-      transition: height 0.2s;
-      position: relative;
+      background: var(--bar-neutral);
+      border-radius: 2px 2px 0 0;
+      transition: opacity 120ms var(--ease);
     }
-    .bar-col:hover { opacity: 1; }
-    .chart-axis { display: flex; justify-content: space-between; font-size: 0.72rem; color: var(--muted); margin-top: 0.4rem; font-family: ui-monospace, monospace; }
-    table { width: 100%; border-collapse: collapse; font-size: 0.83rem; }
-    th, td { text-align: left; padding: 0.5rem 0.55rem; border-bottom: 1px solid rgba(255,255,255,0.05); }
-    th { color: var(--muted); font-weight: 600; font-size: 0.75rem; text-transform: uppercase; }
-    td.num, th.num { text-align: right; font-family: ui-monospace, monospace; }
-    .pill-list { display: flex; flex-wrap: wrap; gap: 0.45rem; }
-    .stat-pill {
-      display: inline-flex;
+
+    .bar-col.current {
+      background: var(--accent);
+    }
+
+    .bar-col:hover {
+      opacity: 0.8;
+    }
+
+    .chart-axis {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      line-height: 16px;
+      color: var(--muted);
+      margin-top: 8px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Asymmetric Bottom Grid: Ranked Lists (1fr) + Live Stream (2fr) */
+    .bottom-grid {
+      display: grid;
+      grid-template-columns: 1fr 2fr;
+      gap: 16px;
+    }
+
+    @media (max-width: 1024px) {
+      .bottom-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .side-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      line-height: 20px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    th, td {
+      text-align: left;
+      height: 36px;
+      padding: 0 8px;
+      border-bottom: 1px solid var(--hairline);
+    }
+
+    th {
+      color: var(--muted);
+      font-weight: 400;
+      font-size: 12px;
+      line-height: 16px;
+    }
+
+    td.num, th.num {
+      text-align: right;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 12px;
+    }
+
+    .rank-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .rank-row {
+      display: flex;
       align-items: center;
-      gap: 0.4rem;
-      padding: 0.3rem 0.65rem;
-      border-radius: 8px;
-      background: rgba(255,255,255,0.04);
-      border: 1px solid var(--border);
-      font-size: 0.8rem;
+      justify-content: space-between;
+      height: 28px;
+      font-size: 13px;
+      line-height: 20px;
+      color: var(--text-secondary);
+      border-bottom: 1px solid var(--hairline);
     }
-    .stat-pill strong { color: var(--teal); font-family: ui-monospace, monospace; }
-    .status-ok { color: var(--teal); font-weight: 600; }
-    .status-warn { color: var(--amber); font-weight: 600; }
-    .status-err { color: var(--danger); font-weight: 600; }
-    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.78rem; }
-    a { color: #a58fff; text-decoration: none; }
-    a:hover { text-decoration: underline; }
-    .table-scroll { max-height: 360px; overflow-y: auto; }
+
+    .rank-row strong {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 12px;
+      font-weight: 400;
+      color: var(--text);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .status-ok { color: var(--positive); }
+    .status-warn { color: var(--accent); }
+    .status-err { color: var(--negative); }
+
+    .mono {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 12px;
+      line-height: 16px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    a {
+      color: var(--text-secondary);
+      text-decoration: none;
+    }
+
+    a:hover {
+      color: var(--text);
+    }
+
+    .table-scroll {
+      max-height: 440px;
+      overflow-y: auto;
+    }
   </style>
 </head>
 <body>
   <div class="container">
-    <header>
+    <header class="topbar">
       <div class="title-row">
         <img src="/logo.svg" alt="RosettaSubs" />
-        <div>
-          <div style="display:flex;align-items:center;gap:0.6rem;">
-            <h1>RosettaSubs Observability</h1>
-            <span class="badge-private">LAN Private</span>
-          </div>
-          <div id="uptimeText" class="meta-status">Loading live metrics...</div>
-        </div>
+        <h1>RosettaSubs Observability</h1>
+        <span class="status-dot" title="LAN private telemetry active"></span>
       </div>
-      <div id="refreshIndicator" class="meta-status">Auto-refresh: 3s</div>
+      <div style="display:flex;align-items:center;gap:24px;">
+        <span id="uptimeText" class="meta-status">Loading metrics</span>
+        <span id="refreshIndicator" class="meta-status">3s interval</span>
+      </div>
     </header>
 
     <div class="kpi-grid">
       <div class="card">
-        <div class="kpi-label">Unique Users (24h)</div>
+        <div class="kpi-label">Active users (24h)</div>
         <div id="kpiUsers24h" class="kpi-value">0</div>
-        <div class="kpi-sub">5m: <strong id="kpiUsers5m">0</strong> &bull; 1h: <strong id="kpiUsers1h">0</strong> &bull; All-time: <strong id="kpiUsersTotal">0</strong></div>
+        <div class="kpi-sub">5m <strong id="kpiUsers5m">0</strong> • 1h <strong id="kpiUsers1h">0</strong> • Total <strong id="kpiUsersTotal">0</strong></div>
       </div>
       <div class="card">
-        <div class="kpi-label">Total Requests</div>
+        <div class="kpi-label">Requests</div>
         <div id="kpiReqTotal" class="kpi-value">0</div>
-        <div class="kpi-sub">Current: <strong id="kpiReqMin">0</strong>/min &bull; Last 60m: <strong id="kpiReq60m">0</strong></div>
+        <div class="kpi-sub">Now <strong id="kpiReqMin">0</strong>/min • 60m <strong id="kpiReq60m">0</strong></div>
       </div>
       <div class="card">
-        <div class="kpi-label">Traffic (Egress / Ingress)</div>
+        <div class="kpi-label">Egress traffic</div>
         <div id="kpiTrafficOut" class="kpi-value">0 B</div>
-        <div class="kpi-sub">In: <strong id="kpiTrafficIn">0 B</strong> &bull; Avg: <strong id="kpiAvgMs">0 ms</strong> (p95: <strong id="kpiP95Ms">0 ms</strong>)</div>
+        <div class="kpi-sub">In <strong id="kpiTrafficIn">0 B</strong> • Avg <strong id="kpiAvgMs">0 ms</strong> (p95 <strong id="kpiP95Ms">0 ms</strong>)</div>
       </div>
       <div class="card">
-        <div class="kpi-label">Cache Hit Ratio &amp; RAM</div>
+        <div class="kpi-label">Cache hit rate</div>
         <div id="kpiCacheHit" class="kpi-value">0%</div>
-        <div class="kpi-sub">Search: <strong id="kpiSearchCache">0</strong> &bull; SRTs: <strong id="kpiSubCache">0</strong> &bull; RSS: <strong id="kpiRam">0 MB</strong></div>
+        <div class="kpi-sub">Search <strong id="kpiSearchCache">0</strong> • SRT <strong id="kpiSubCache">0</strong> • RSS <strong id="kpiRam">0 MB</strong></div>
       </div>
     </div>
 
-    <div class="grid-2">
+    <div class="main-grid">
       <div class="card">
         <h2>
-          <span>Requests per Minute (Last 60m)</span>
+          <span>Requests per minute (last 60 minutes)</span>
           <span id="statusSummary" class="meta-status"></span>
         </h2>
         <div id="barsContainer" class="bars"></div>
@@ -180,7 +360,7 @@ export function renderDashboardPage(): string {
       </div>
 
       <div class="card">
-        <h2>Traffic by Route</h2>
+        <h2>Traffic by route</h2>
         <table>
           <thead>
             <tr>
@@ -196,38 +376,40 @@ export function renderDashboardPage(): string {
       </div>
     </div>
 
-    <div class="grid-3">
-      <div class="card">
-        <h2>Top Requested Languages</h2>
-        <div id="langPills" class="pill-list"></div>
+    <div class="bottom-grid">
+      <div class="side-stack">
+        <div class="card">
+          <h2>Top languages</h2>
+          <div id="langPills" class="rank-list"></div>
+        </div>
+        <div class="card">
+          <h2>Top countries</h2>
+          <div id="countryPills" class="rank-list"></div>
+        </div>
+        <div class="card">
+          <h2>Most requested titles</h2>
+          <div id="mediaPills" class="rank-list"></div>
+        </div>
       </div>
-      <div class="card">
-        <h2>Top Countries (Cloudflare)</h2>
-        <div id="countryPills" class="pill-list"></div>
-      </div>
-      <div class="card">
-        <h2>Most Watched Titles (IMDb)</h2>
-        <div id="mediaPills" class="pill-list"></div>
-      </div>
-    </div>
 
-    <div class="card">
-      <h2>Live Request Stream (Last 60)</h2>
-      <div class="table-scroll">
-        <table>
-          <thead>
-            <tr>
-              <th>Time (UTC)</th>
-              <th>Route</th>
-              <th>Path</th>
-              <th class="num">Status</th>
-              <th class="num">Latency</th>
-              <th class="num">Size</th>
-              <th>Client</th>
-            </tr>
-          </thead>
-          <tbody id="eventsBody"></tbody>
-        </table>
+      <div class="card">
+        <h2>Recent requests</h2>
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Time (UTC)</th>
+                <th>Route</th>
+                <th>Path</th>
+                <th class="num">Status</th>
+                <th class="num">Latency</th>
+                <th class="num">Size</th>
+                <th>Client</th>
+              </tr>
+            </thead>
+            <tbody id="eventsBody"></tbody>
+          </table>
+        </div>
       </div>
     </div>
   </div>
@@ -248,13 +430,13 @@ export function renderDashboardPage(): string {
     }
 
     const ROUTE_NAMES = {
-      subtitles: 'Subtitles Search (/subtitles)',
-      subProxy: 'SRT Proxy (/sub)',
-      dual: 'Dual Subtitles (/dual)',
-      translate: 'AI Translate (/translate)',
-      configure: 'Configure UI (/configure)',
+      subtitles: 'Subtitles (/subtitles)',
+      subProxy: 'SRT proxy (/sub)',
+      dual: 'Dual track (/dual)',
+      translate: 'AI translate (/translate)',
+      configure: 'Configure (/configure)',
       manifest: 'Manifest (/manifest.json)',
-      transcribe: 'Audio Transcribe (/api)',
+      transcribe: 'Transcribe (/api)',
       other: 'Other'
     };
 
@@ -266,7 +448,7 @@ export function renderDashboardPage(): string {
         const d = await res.json();
 
         document.getElementById('uptimeText').textContent =
-          'Uptime: ' + fmtUptime(d.uptimeSeconds) + ' • Since ' + d.startedAt.slice(0, 19).replace('T', ' ') + ' UTC';
+          'Uptime ' + fmtUptime(d.uptimeSeconds) + ' • Since ' + d.startedAt.slice(0, 19).replace('T', ' ') + ' UTC';
 
         document.getElementById('kpiUsers24h').textContent = d.users.active24h.toLocaleString();
         document.getElementById('kpiUsers5m').textContent = d.users.active5m.toLocaleString();
@@ -289,17 +471,17 @@ export function renderDashboardPage(): string {
 
         const st = d.traffic.byStatus;
         document.getElementById('statusSummary').textContent =
-          '2xx: ' + st['2xx'] + ' • 3xx: ' + st['3xx'] + ' • 4xx: ' + st['4xx'] + ' • 5xx: ' + st['5xx'];
+          '2xx ' + st['2xx'] + ' • 3xx ' + st['3xx'] + ' • 4xx ' + st['4xx'] + ' • 5xx ' + st['5xx'];
 
         const barsEl = document.getElementById('barsContainer');
         barsEl.innerHTML = '';
         const maxReq = Math.max(1, ...d.timeline60m.map((x) => x.requests));
-        d.timeline60m.forEach((b) => {
+        d.timeline60m.forEach((b, idx) => {
           const col = document.createElement('div');
-          col.className = 'bar-col';
-          const pct = b.requests === 0 ? 3 : Math.max(8, Math.round((b.requests / maxReq) * 100));
+          const isCurrent = idx === d.timeline60m.length - 1;
+          col.className = 'bar-col' + (isCurrent ? ' current' : '');
+          const pct = b.requests === 0 ? 2 : Math.max(6, Math.round((b.requests / maxReq) * 100));
           col.style.height = pct + '%';
-          if (b.requests === 0) col.style.opacity = '0.18';
           col.title = b.label + ' UTC — ' + b.requests + ' reqs (' + fmtBytes(b.bytesSent) + ', ' + b.uniqueUsers + ' users)';
           barsEl.appendChild(col);
         });
@@ -313,7 +495,7 @@ export function renderDashboardPage(): string {
         Object.entries(d.traffic.byRoute).forEach(([key, rm]) => {
           if (rm.count === 0 && key === 'other') return;
           const tr = document.createElement('tr');
-          const avg = rm.count > 0 ? Math.round(rm.totalMs / rm.count) + 'ms' : '-';
+          const avg = rm.count > 0 ? Math.round(rm.totalMs / rm.count) + ' ms' : '-';
           tr.innerHTML =
             '<td>' + (ROUTE_NAMES[key] || key) + '</td>' +
             '<td class="num">' + rm.count.toLocaleString() + '</td>' +
@@ -325,17 +507,17 @@ export function renderDashboardPage(): string {
 
         const langPills = document.getElementById('langPills');
         langPills.innerHTML = d.topLanguages.length
-          ? d.topLanguages.map((x) => '<span class="stat-pill">' + x.lang.toUpperCase() + ' <strong>' + x.count + '</strong></span>').join('')
+          ? d.topLanguages.map((x) => '<div class="rank-row"><span>' + x.lang.toUpperCase() + '</span><strong>' + x.count.toLocaleString() + '</strong></div>').join('')
           : '<span class="meta-status">No subtitle requests yet</span>';
 
         const countryPills = document.getElementById('countryPills');
         countryPills.innerHTML = d.users.topCountries.length
-          ? d.users.topCountries.map((x) => '<span class="stat-pill">' + x.country + ' <strong>' + x.count + '</strong></span>').join('')
+          ? d.users.topCountries.map((x) => '<div class="rank-row"><span>' + x.country + '</span><strong>' + x.count.toLocaleString() + '</strong></div>').join('')
           : '<span class="meta-status">No visitors yet</span>';
 
         const mediaPills = document.getElementById('mediaPills');
         mediaPills.innerHTML = d.topMedia.length
-          ? d.topMedia.map((x) => '<a class="stat-pill" href="https://www.imdb.com/title/' + x.imdbId + '/" target="_blank" rel="noopener">' + x.imdbId + ' (' + x.type + ') <strong>' + x.count + '</strong></a>').join('')
+          ? d.topMedia.map((x) => '<div class="rank-row"><a href="https://www.imdb.com/title/' + x.imdbId + '/" target="_blank" rel="noopener">' + x.imdbId + ' (' + x.type + ')</a><strong>' + x.count.toLocaleString() + '</strong></div>').join('')
           : '<span class="meta-status">No titles queried yet</span>';
 
         const eventsBody = document.getElementById('eventsBody');
@@ -348,7 +530,7 @@ export function renderDashboardPage(): string {
             '<td>' + ev.route + '</td>' +
             '<td class="mono">' + ev.path.replace(/</g, '&lt;') + '</td>' +
             '<td class="num ' + stClass + '">' + ev.status + '</td>' +
-            '<td class="num">' + ev.durationMs + 'ms</td>' +
+            '<td class="num">' + ev.durationMs + ' ms</td>' +
             '<td class="num">' + fmtBytes(ev.bytesSent) + '</td>' +
             '<td class="mono">' + ev.country + ' • ' + ev.clientHash.slice(0, 8) + '</td>';
           eventsBody.appendChild(tr);
