@@ -117,6 +117,7 @@ export function createApp() {
       return;
     }
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
     res.send(renderDashboardPage());
   });
 
@@ -125,6 +126,7 @@ export function createApp() {
       res.status(404).json({ error: 'Not found' });
       return;
     }
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
     res.json(metrics.snapshot());
   });
 
@@ -388,10 +390,12 @@ export function createStatsApp() {
 
   statsApp.get(['/', '/stats'], (_req: Request, res: Response) => {
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
     res.send(renderDashboardPage());
   });
 
   statsApp.get('/api/stats', (_req: Request, res: Response) => {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
     res.json(metrics.snapshot());
   });
 

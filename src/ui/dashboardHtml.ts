@@ -446,11 +446,18 @@ export function renderDashboardPage(): string {
     };
 
     async function refresh() {
+      const ind = document.getElementById('refreshIndicator');
       try {
-        const q = window.location.search || '';
-        const res = await fetch('/api/stats' + q);
-        if (!res.ok) return;
+        const sep = window.location.search ? '&' : '?';
+        const res = await fetch('/api/stats' + (window.location.search || '') + sep + '_t=' + Date.now(), {
+          cache: 'no-store'
+        });
+        if (!res.ok) {
+          ind.textContent = 'HTTP ' + res.status + ' • retrying';
+          return;
+        }
         const d = await res.json();
+        ind.textContent = 'Updated ' + d.now.slice(11, 19) + ' UTC • 3s';
 
         document.getElementById('uptimeText').textContent =
           'Uptime ' + fmtUptime(d.uptimeSeconds) + ' • Since ' + d.startedAt.slice(0, 19).replace('T', ' ') + ' UTC';
@@ -548,7 +555,7 @@ export function renderDashboardPage(): string {
           eventsBody.appendChild(tr);
         });
       } catch (e) {
-        // ignore transient fetch errors
+        if (ind) ind.textContent = 'Offline • retrying';
       }
     }
 

@@ -63,6 +63,10 @@ interface PersistedMetrics {
   users: Array<[string, UserRecord]>;
   topLanguages: Array<[string, number]>;
   topMedia: Array<[string, { imdbId: string; type: string; count: number; lastSeen: number }]>;
+  recentEvents?: RecentRequestEvent[];
+  minuteBuckets?: Array<
+    [number, { minute: number; requests: number; renderRequests: number; bytesSent: number; users: string[] }]
+  >;
 }
 
 const ROUTE_CATEGORIES: RouteCategory[] = [
@@ -162,7 +166,7 @@ class MetricsCollector {
     this.loadFromDisk();
 
     if (process.env.NODE_ENV !== 'test') {
-      const timer = setInterval(() => this.flushToDisk(), 30_000);
+      const timer = setInterval(() => this.flushToDisk(), 10_000);
       timer.unref();
     }
   }
@@ -203,6 +207,23 @@ class MetricsCollector {
       if (Array.isArray(data.topMedia)) {
         this.topMedia = new Map(data.topMedia.slice(-2000));
       }
+      if (Array.isArray(data.recentEvents)) {
+        this.recentEvents = data.recentEvents.slice(0, 120);
+      }
+      if (Array.isArray(data.minuteBuckets)) {
+        this.minuteBuckets = new Map(
+          data.minuteBuckets.map(([k, v]) => [
+            k,
+            {
+              minute: v.minute,
+              requests: v.requests || 0,
+              renderRequests: v.renderRequests || 0,
+              bytesSent: v.bytesSent || 0,
+              users: new Set(Array.isArray(v.users) ? v.users : [])
+            }
+          ])
+        );
+      }
     } catch {
       // Ignore corrupt or missing file
     }
@@ -226,7 +247,18 @@ class MetricsCollector {
         byStatus: this.byStatus,
         users: Array.from(this.users.entries()).slice(-25000),
         topLanguages: Array.from(this.topLanguages.entries()),
-        topMedia: Array.from(this.topMedia.entries()).slice(-1000)
+        topMedia: Array.from(this.topMedia.entries()).slice(-1000),
+        recentEvents: this.recentEvents.slice(0, 120),
+        minuteBuckets: Array.from(this.minuteBuckets.entries()).map(([k, b]) => [
+          k,
+          {
+            minute: b.minute,
+            requests: b.requests,
+            renderRequests: b.renderRequests,
+            bytesSent: b.bytesSent,
+            users: Array.from(b.users)
+          }
+        ])
       };
       fs.writeFileSync(this.persistPath, JSON.stringify(payload), 'utf8');
       this.dirty = false;
