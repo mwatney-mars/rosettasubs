@@ -110,8 +110,11 @@ export function createApp() {
           .join(',')}`
       );
 
-      res.setHeader('Vary', 'Origin, User-Agent');
-      res.setHeader('Cache-Control', 'public, max-age=900, stale-while-revalidate=1800');
+      res.setHeader('Vary', 'Origin');
+      res.setHeader(
+        'Cache-Control',
+        'public, max-age=900, s-maxage=3600, stale-while-revalidate=86400'
+      );
       res.json({
         subtitles,
         cacheMaxAge: 900,
@@ -143,7 +146,7 @@ export function createApp() {
         `[SUB-OK] u=${payload.u} fb=${payload.fb || '-'} bytes=${Buffer.byteLength(srt, 'utf8')} se=${payload.se ?? '-'} ep=${payload.ep ?? '-'}`
       );
       res.setHeader('Content-Type', 'application/x-subrip; charset=utf-8');
-      res.setHeader('Cache-Control', 'public, max-age=86400');
+      res.setHeader('Cache-Control', 'public, max-age=86400, s-maxage=604800, immutable');
       res.send(srt);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Subtitle fetch failed';

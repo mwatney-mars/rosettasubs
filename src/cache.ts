@@ -65,6 +65,8 @@ export class TTLCache<T> {
   }
 }
 
-const defaultTtl = Number(process.env.CACHE_TTL_MS) || 15 * 60 * 1000;
-export const searchCache = new TTLCache<unknown>(defaultTtl, 1000);
-export const subtitleContentCache = new TTLCache<string>(60 * 60 * 1000, 500);
+const defaultTtl = Number(process.env.CACHE_TTL_MS) || 60 * 60 * 1000;
+const searchCacheMax = Number(process.env.SEARCH_CACHE_MAX) || 5000;
+const subtitleCacheMax = Number(process.env.SUBTITLE_CACHE_MAX) || 2000;
+export const searchCache = new TTLCache<unknown>(defaultTtl, searchCacheMax);
+export const subtitleContentCache = new TTLCache<string>(24 * 60 * 60 * 1000, subtitleCacheMax);

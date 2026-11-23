@@ -34,7 +34,15 @@ npm run dev
 - **Default Manifest**: `http://localhost:7000/manifest.json`
 - **Health & Cache Stats**: `http://localhost:7000/health`
 
-## Docker
+## Home Server + Cloudflare Tunnel Deployment (Recommended)
+
+Run RosettaSubs on your home server behind a Cloudflare Tunnel (`cloudflared`) with zero port-forwarding:
+
+1. In [Cloudflare Zero Trust](https://one.dash.cloudflare.com/) → **Networks → Tunnels**, create a tunnel and point your public hostname (e.g., `subs.yourdomain.com`) to `http://rosettasubs:7000`.
+2. (Recommended) Add a **Cloudflare Cache Rule** for your hostname:
+   - Match: `URI Path` ends with `.json` or `.srt`
+   - Cache eligibility: **Eligible for cache** (Use origin `Cache-Control` headers)
+3. Copy `.env.example` to `.env`, set `BASE_URL=https://subs.yourdomain.com` and `CLOUDFLARE_TUNNEL_TOKEN=<your_token>`, and start:
 
 ```bash
 cp .env.example .env
