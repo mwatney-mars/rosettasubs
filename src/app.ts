@@ -8,12 +8,14 @@ import {
 } from './config';
 import { buildManifest } from './manifest';
 import { renderConfigurePage } from './ui/configureHtml';
+import { renderDashboardPage } from './ui/dashboardHtml';
 import { LOGO_SVG } from './ui/logo';
 import { getStremioSubtitles, parseStremioSubtitleRequest } from './providers';
 import { fetchAndNormalizeSubtitle } from './providers/fetcher';
 import { annotateSrtIdioms, transcribeMediaToSrt, translateSrtContent } from './ai/multimodal';
 import { mergeDualSrt } from './subtitleConverter';
 import { searchCache, subtitleContentCache } from './cache';
+import { isPrivateLanRequest, metrics } from './metrics';
 
 function resolveBaseUrl(req: Request): string {
   const configuredUrl = process.env.BASE_URL || process.env.RENDER_EXTERNAL_URL;
@@ -42,17 +44,32 @@ export function createApp() {
   app.use(express.json({ limit: '25mb' }));
 
   app.use((req: Request, res: Response, next) => {
-    if (req.path === '/health' || req.path === '/logo.svg') {
+    if (
+      req.path === '/health' ||
+      req.path === '/logo.svg' ||
+      req.path.startsWith('/stats') ||
+      req.path.startsWith('/api/stats')
+    ) {
       next();
       return;
     }
     const start = Date.now();
+    const reqBytes = Number(req.headers['content-length']) || 0;
     res.on('finish', () => {
+      const durationMs = Date.now() - start;
+      const contentLen = Number(res.getHeader('content-length')) || 0;
+      metrics.recordRequest({
+        req,
+        status: res.statusCode,
+        durationMs,
+        bytesSent: contentLen,
+        bytesReceived: reqBytes
+      });
       const ua = req.headers['user-agent'] || '-';
       const shortPath =
         req.originalUrl.length > 140 ? `${req.originalUrl.slice(0, 140)}...` : req.originalUrl;
       logEvent(
-        `[HTTP] ${req.method} ${shortPath} -> ${res.statusCode} (${Date.now() - start}ms) ua="${ua}"`
+        `[HTTP] ${req.method} ${shortPath} -> ${res.statusCode} (${durationMs}ms) ua="${ua}"`
       );
     });
     next();
@@ -62,15 +79,33 @@ export function createApp() {
     res.redirect('/configure');
   });
 
-  app.get('/health', (_req: Request, res: Response) => {
+  app.get('/health', (req: Request, res: Response) => {
+    const isPrivate = isPrivateLanRequest(req);
     res.json({
       status: 'ok',
       cache: {
         search: searchCache.stats(),
         subtitles: subtitleContentCache.stats()
       },
-      recentLogs
+      ...(isPrivate ? { recentLogs } : {})
     });
+  });
+
+  app.get('/stats', (req: Request, res: Response) => {
+    if (!isPrivateLanRequest(req)) {
+      res.status(404).send('Not found');
+      return;
+    }
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.send(renderDashboardPage());
+  });
+
+  app.get('/api/stats', (req: Request, res: Response) => {
+    if (!isPrivateLanRequest(req)) {
+      res.status(404).json({ error: 'Not found' });
+      return;
+    }
+    res.json(metrics.snapshot());
   });
 
   app.get('/logo.svg', (_req: Request, res: Response) => {
@@ -99,6 +134,7 @@ export function createApp() {
       const rawExtra = req.params.extra;
 
       const query = parseStremioSubtitleRequest(type, rawId, rawExtra, config.languages);
+      metrics.recordSubtitleQuery(type, query.imdbId, config.languages);
       const baseUrl = resolveBaseUrl(req);
       const descriptiveLang = req.query.descriptiveLang === '1';
       const subtitles = await getStremioSubtitles(query, config, baseUrl, { descriptiveLang });
@@ -319,4 +355,25 @@ export function createApp() {
   });
 
   return app;
+}
+
+export function createStatsApp() {
+  const statsApp = express();
+  statsApp.use(cors());
+
+  statsApp.get('/logo.svg', (_req: Request, res: Response) => {
+    res.setHeader('Content-Type', 'image/svg+xml; charset=utf-8');
+    res.send(LOGO_SVG);
+  });
+
+  statsApp.get(['/', '/stats'], (_req: Request, res: Response) => {
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.send(renderDashboardPage());
+  });
+
+  statsApp.get('/api/stats', (_req: Request, res: Response) => {
+    res.json(metrics.snapshot());
+  });
+
+  return statsApp;
 }

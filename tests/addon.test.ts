@@ -501,4 +501,20 @@ describe('Express Stremio Add-on Routes & Multimodal AI Flow', () => {
     expect(dualRes.text).toContain('<b>No manches, güey. [no manches: no way / kidding me]</b>');
     expect(dualRes.text).toContain('<font color="#999999">No way, dude.</font>');
   });
+
+  it('serves private observability dashboard on LAN and hides it from public Cloudflare requests', async () => {
+    const lanDashboard = await request(app).get('/stats');
+    expect(lanDashboard.status).toBe(200);
+    expect(lanDashboard.text).toContain('RosettaSubs Observability');
+
+    const lanStats = await request(app).get('/api/stats');
+    expect(lanStats.status).toBe(200);
+    expect(lanStats.body.traffic.totalRequests).toBeGreaterThan(0);
+    expect(lanStats.body.users.totalUnique).toBeGreaterThan(0);
+
+    const publicBlocked = await request(app)
+      .get('/api/stats')
+      .set('cf-connecting-ip', '203.0.113.42');
+    expect(publicBlocked.status).toBe(404);
+  });
 });

@@ -4,6 +4,9 @@ services:
     container_name: rosettasubs
     ports:
       - "${PORT:-7000}:7000"
+      - "${STATS_PORT:-7001}:7001"
+    volumes:
+      - ./data:/data
     env_file:
       - .env
     healthcheck:
