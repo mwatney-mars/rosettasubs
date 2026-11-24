@@ -27,52 +27,68 @@ export function renderDashboardPage(): string {
       box-sizing: border-box;
     }
 
-    body {
+    html, body {
       margin: 0;
+      padding: 0;
+      width: 100%;
+      max-width: 100%;
+      overflow-x: hidden;
       font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       background: var(--bg);
       color: var(--text);
       font-size: 14px;
       line-height: 20px;
       font-weight: 400;
-      padding: 0 32px 48px;
       -webkit-font-smoothing: antialiased;
     }
 
     .container {
-      max-width: 1480px;
+      width: 100%;
+      max-width: 1520px;
       margin: 0 auto;
+      padding: 0 clamp(12px, 2.5vw, 32px) 48px;
     }
 
     header.topbar {
-      height: 64px;
+      min-height: 56px;
+      padding: 12px 0;
       display: flex;
       align-items: center;
       justify-content: space-between;
       flex-wrap: wrap;
-      gap: 16px;
+      gap: 12px 16px;
       border-bottom: 1px solid var(--hairline);
-      margin-bottom: 24px;
+      margin-bottom: 20px;
     }
 
     .title-row {
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .topbar-right {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px 16px;
     }
 
     .title-row img {
       width: 28px;
       height: 28px;
       border-radius: 6px;
+      flex-shrink: 0;
     }
 
     h1 {
       margin: 0;
-      font-size: 16px;
+      font-size: clamp(15px, 1.5vw, 16px);
       line-height: 20px;
       font-weight: 500;
       color: var(--text);
+      white-space: nowrap;
     }
 
     .status-dot {
@@ -81,6 +97,7 @@ export function renderDashboardPage(): string {
       border-radius: 50%;
       background: var(--positive);
       display: inline-block;
+      flex-shrink: 0;
     }
 
     .meta-status {
@@ -91,23 +108,18 @@ export function renderDashboardPage(): string {
       font-variant-numeric: tabular-nums;
     }
 
-    /* 5 Compact Stat Cards (Numbers Only) */
+    /* Responsive Auto-Fit Stat Cards */
     .kpi-grid {
       display: grid;
-      grid-template-columns: repeat(5, 1fr);
-      gap: 16px;
-      margin-bottom: 24px;
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+      gap: 12px;
+      margin-bottom: 16px;
     }
 
-    @media (max-width: 1120px) {
+    @media (max-width: 480px) {
       .kpi-grid {
-        grid-template-columns: repeat(2, 1fr);
-      }
-    }
-
-    @media (max-width: 560px) {
-      .kpi-grid {
-        grid-template-columns: 1fr;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
       }
     }
 
@@ -115,21 +127,26 @@ export function renderDashboardPage(): string {
       background: var(--card);
       border: 1px solid var(--hairline);
       border-radius: 12px;
-      padding: 20px;
+      padding: clamp(14px, 2vw, 20px);
+      min-width: 0;
+      overflow: hidden;
     }
 
     .kpi-label {
-      font-size: 13px;
-      line-height: 20px;
+      font-size: 12px;
+      line-height: 16px;
       color: var(--text-secondary);
       font-weight: 400;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     .kpi-value {
-      font-size: 28px;
-      line-height: 32px;
+      font-size: clamp(20px, 2.2vw, 28px);
+      line-height: 1.15;
       font-weight: 500;
-      margin: 8px 0;
+      margin: 6px 0;
       color: var(--text);
       font-variant-numeric: tabular-nums;
     }
@@ -140,6 +157,9 @@ export function renderDashboardPage(): string {
       color: var(--muted);
       font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
       font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     .kpi-sub strong {
@@ -147,22 +167,22 @@ export function renderDashboardPage(): string {
       font-weight: 500;
     }
 
-    /* Main Chart (2/3) + Route Table (1/3) */
+    /* Main Chart + Route Table */
     .main-grid {
       display: grid;
-      grid-template-columns: 2fr 1fr;
+      grid-template-columns: minmax(0, 1.85fr) minmax(320px, 1fr);
       gap: 16px;
-      margin-bottom: 24px;
+      margin-bottom: 16px;
     }
 
-    @media (max-width: 1024px) {
+    @media (max-width: 1080px) {
       .main-grid {
-        grid-template-columns: 1fr;
+        grid-template-columns: minmax(0, 1fr);
       }
     }
 
     h2 {
-      margin: 0 0 16px;
+      margin: 0 0 12px;
       font-size: 14px;
       line-height: 20px;
       font-weight: 500;
@@ -170,22 +190,25 @@ export function renderDashboardPage(): string {
       display: flex;
       justify-content: space-between;
       align-items: baseline;
+      flex-wrap: wrap;
+      gap: 8px;
     }
 
     .bars {
       display: flex;
       align-items: flex-end;
-      gap: 4px;
-      height: 280px;
+      gap: clamp(2px, 0.35vw, 4px);
+      height: clamp(160px, 26vh, 260px);
       padding-top: 16px;
       border-bottom: 1px solid var(--hairline);
       background-image: linear-gradient(to bottom, var(--hairline) 1px, transparent 1px);
-      background-size: 100% 70px;
+      background-size: 100% 25%;
+      width: 100%;
     }
 
     .bar-col {
-      flex: 1;
-      min-width: 4px;
+      flex: 1 1 0;
+      min-width: 2px;
       background: var(--bar-neutral);
       border-radius: 2px 2px 0 0;
       transition: opacity 120ms var(--ease);
@@ -210,23 +233,34 @@ export function renderDashboardPage(): string {
       font-variant-numeric: tabular-nums;
     }
 
-    /* Asymmetric Bottom Grid: Ranked Lists (1fr) + Live Stream (2fr) */
+    /* Bottom Grid: Ranked Lists + Live Stream */
     .bottom-grid {
       display: grid;
-      grid-template-columns: 1fr 2fr;
+      grid-template-columns: minmax(280px, 1fr) minmax(0, 2.15fr);
       gap: 16px;
-    }
-
-    @media (max-width: 1024px) {
-      .bottom-grid {
-        grid-template-columns: 1fr;
-      }
+      align-items: start;
     }
 
     .side-stack {
-      display: flex;
-      flex-direction: column;
+      display: grid;
+      grid-template-columns: 1fr;
       gap: 16px;
+      min-width: 0;
+    }
+
+    @media (max-width: 1080px) {
+      .bottom-grid {
+        grid-template-columns: minmax(0, 1fr);
+      }
+      .side-stack {
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      }
+    }
+
+    .table-wrap {
+      width: 100%;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
     }
 
     table {
@@ -242,6 +276,23 @@ export function renderDashboardPage(): string {
       height: 36px;
       padding: 0 8px;
       border-bottom: 1px solid var(--hairline);
+      white-space: nowrap;
+    }
+
+    td.path-cell {
+      max-width: clamp(140px, 28vw, 420px);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    @media (max-width: 640px) {
+      .hide-sm {
+        display: none;
+      }
+      th, td {
+        padding: 0 6px;
+      }
     }
 
     th {
@@ -317,7 +368,7 @@ export function renderDashboardPage(): string {
         <span class="meta-status">v1.1.0</span>
         <span class="status-dot" title="LAN private telemetry active"></span>
       </div>
-      <div style="display:flex;align-items:center;gap:24px;">
+      <div class="topbar-right">
         <span id="uptimeText" class="meta-status">Loading metrics</span>
         <span id="refreshIndicator" class="meta-status">3s interval</span>
       </div>
@@ -367,18 +418,20 @@ export function renderDashboardPage(): string {
 
       <div class="card">
         <h2>Traffic by route</h2>
-        <table>
-          <thead>
-            <tr>
-              <th>Endpoint</th>
-              <th class="num">Reqs</th>
-              <th class="num">Egress</th>
-              <th class="num">Avg</th>
-              <th class="num">Err</th>
-            </tr>
-          </thead>
-          <tbody id="routeTableBody"></tbody>
-        </table>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Endpoint</th>
+                <th class="num">Reqs</th>
+                <th class="num">Egress</th>
+                <th class="num hide-sm">Avg</th>
+                <th class="num">Err</th>
+              </tr>
+            </thead>
+            <tbody id="routeTableBody"></tbody>
+          </table>
+        </div>
       </div>
     </div>
 
@@ -400,16 +453,16 @@ export function renderDashboardPage(): string {
 
       <div class="card">
         <h2>Recent requests</h2>
-        <div class="table-scroll">
+        <div class="table-scroll table-wrap">
           <table>
             <thead>
               <tr>
-                <th>Time (UTC)</th>
+                <th>Time</th>
                 <th>Route</th>
                 <th>Path</th>
                 <th class="num">Status</th>
-                <th class="num">Latency</th>
-                <th class="num">Size</th>
+                <th class="num hide-sm">Latency</th>
+                <th class="num hide-sm">Size</th>
                 <th>Client</th>
               </tr>
             </thead>
@@ -519,7 +572,7 @@ export function renderDashboardPage(): string {
             '<td>' + (ROUTE_NAMES[key] || key) + '</td>' +
             '<td class="num">' + rm.count.toLocaleString() + '</td>' +
             '<td class="num">' + fmtBytes(rm.bytesSent) + '</td>' +
-            '<td class="num">' + avg + '</td>' +
+            '<td class="num hide-sm">' + avg + '</td>' +
             '<td class="num ' + (rm.errors > 0 ? 'status-err' : '') + '">' + rm.errors + '</td>';
           routeBody.appendChild(tr);
         });
@@ -545,13 +598,14 @@ export function renderDashboardPage(): string {
           const tr = document.createElement('tr');
           const stClass = ev.status >= 500 ? 'status-err' : ev.status >= 400 ? 'status-warn' : 'status-ok';
           const srcTag = ev.viaRender ? ' • <span class="status-warn">render</span>' : '';
+          const safePath = ev.path.replace(/</g, '&lt;').replace(/"/g, '&quot;');
           tr.innerHTML =
             '<td class="mono">' + ev.ts.slice(11, 19) + '</td>' +
             '<td>' + ev.route + srcTag + '</td>' +
-            '<td class="mono">' + ev.path.replace(/</g, '&lt;') + '</td>' +
+            '<td class="mono path-cell" title="' + safePath + '">' + safePath + '</td>' +
             '<td class="num ' + stClass + '">' + ev.status + '</td>' +
-            '<td class="num">' + ev.durationMs + ' ms</td>' +
-            '<td class="num">' + fmtBytes(ev.bytesSent) + '</td>' +
+            '<td class="num hide-sm">' + ev.durationMs + ' ms</td>' +
+            '<td class="num hide-sm">' + fmtBytes(ev.bytesSent) + '</td>' +
             '<td class="mono">' + ev.country + ' • ' + ev.clientHash.slice(0, 8) + '</td>';
           eventsBody.appendChild(tr);
         });
