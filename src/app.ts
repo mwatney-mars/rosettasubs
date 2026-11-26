@@ -353,15 +353,22 @@ export function createApp() {
       }
 
       if (payload.annotate) {
-        primarySrt = await annotateSrtIdioms({
-          srtContent: primarySrt,
-          fromLang: payload.primaryLang,
-          toLang: payload.secondaryLang,
-          aiProvider,
-          apiKey: payload.aiApiKey,
-          model: payload.aiModel,
-          baseUrl: payload.aiBaseUrl
-        });
+        try {
+          primarySrt = await annotateSrtIdioms({
+            srtContent: primarySrt,
+            fromLang: payload.primaryLang,
+            toLang: payload.secondaryLang,
+            aiProvider,
+            apiKey: payload.aiApiKey,
+            model: payload.aiModel,
+            baseUrl: payload.aiBaseUrl
+          });
+        } catch (annErr) {
+          const annMsg = annErr instanceof Error ? annErr.message : String(annErr);
+          logEvent(
+            `[DUAL-WARN] annotate failed (${payload.primaryLang}->${payload.secondaryLang}), serving unannotated dual track: "${annMsg.replace(/\s+/g, ' ').slice(0, 200)}"`
+          );
+        }
       }
 
       const merged = mergeDualSrt(primarySrt, secondarySrt);
@@ -369,11 +376,17 @@ export function createApp() {
         subtitleContentCache.set(cacheKey, merged);
       }
 
+      logEvent(
+        `[DUAL-OK] ${payload.primaryLang}+${payload.secondaryLang} bytes=${Buffer.byteLength(merged, 'utf8')}`
+      );
       res.setHeader('Content-Type', 'application/x-subrip; charset=utf-8');
       res.setHeader('Cache-Control', 'public, max-age=86400');
       res.send(merged);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Dual subtitle generation failed';
+      logEvent(
+        `[DUAL-ERR] ${payload.primaryLang}+${payload.secondaryLang} u=${payload.primary?.u || payload.secondary?.u || '-'} err="${msg.replace(/\s+/g, ' ').slice(0, 300)}"`
+      );
       res.status(502).send(msg);
     }
   });

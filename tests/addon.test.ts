@@ -375,6 +375,57 @@ describe('Express Stremio Add-on Routes & Multimodal AI Flow', () => {
     expect(res.text).toContain('Despierta, Neo.');
   });
 
+  it('auto-upgrades retired gemini-2.0-flash, strips models/ prefix, and routes AQ. keys to Gemini even if openai is selected', async () => {
+    const calledUrls: string[] = [];
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = String(input);
+      calledUrls.push(url);
+      if (url === 'https://example.com/source.srt') {
+        return new Response('1\n00:00:01,000 --> 00:00:03,000\nWake up, Neo.\n', {
+          status: 200
+        });
+      }
+      if (url.includes('gemini-2.5-flash:generateContent')) {
+        return new Response(
+          JSON.stringify({
+            error: { code: 404, message: 'Model not found' }
+          }),
+          { status: 404, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+      if (url.includes('gemini-3.8-flash:generateContent')) {
+        return new Response(
+          JSON.stringify({
+            candidates: [
+              {
+                content: {
+                  parts: [{ text: JSON.stringify([{ i: 1, t: 'استيقظ يا نيو.' }]) }]
+                }
+              }
+            ]
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+      return new Response('', { status: 404 });
+    });
+
+    const token = encodeTranslateToken({
+      src: { u: 'https://example.com/source.srt', f: 'srt' },
+      fromLang: 'eng',
+      toLang: 'ara',
+      aiProvider: 'openai',
+      aiApiKey: 'AQ.Ab8RN_test_google_key',
+      aiModel: 'models/gemini-2.0-flash'
+    });
+
+    const res = await request(app).get(`/translate/${token}.srt`);
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('استيقظ يا نيو.');
+    expect(calledUrls.some((u) => u.includes('models%2F'))).toBe(false);
+    expect(calledUrls.some((u) => u.includes('api.openai.com'))).toBe(false);
+  });
+
   it('transcribes media via POST /api/multimodal/transcribe', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
       new Response(

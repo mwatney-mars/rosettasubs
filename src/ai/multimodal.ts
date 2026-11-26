@@ -28,18 +28,52 @@ interface CueBatchItem {
   t: string;
 }
 
+function normalizeGeminiModelName(rawModel?: string): string {
+  const cleaned = (rawModel || '')
+    .trim()
+    .replace(/^(?:publishers\/google\/)?models\//i, '');
+  if (
+    !cleaned ||
+    cleaned === 'gemini-2.0-flash' ||
+    cleaned === 'gemini-2.0-flash-exp' ||
+    cleaned === 'gemini-1.5-flash' ||
+    cleaned.startsWith('gpt-')
+  ) {
+    return 'gemini-2.5-flash';
+  }
+  return cleaned;
+}
+
+function resolveEffectiveProvider(
+  requested: AIProviderName,
+  apiKey: string,
+  baseUrl?: string
+): AIProviderName {
+  if (!baseUrl) {
+    const trimmed = apiKey.trim();
+    if (trimmed.startsWith('AIza') || trimmed.startsWith('AQ.')) {
+      return 'gemini';
+    }
+    if (trimmed.startsWith('sk-')) {
+      return 'openai';
+    }
+  }
+  return requested;
+}
+
 async function callGeminiEndpoint(
   prompt: string,
   apiKey: string,
   model: string,
   baseUrl: string
 ): Promise<Response> {
-  const url = `${baseUrl.replace(/\/+$/, '')}/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
+  const cleanModel = normalizeGeminiModelName(model);
+  const url = `${baseUrl.replace(/\/+$/, '')}/models/${encodeURIComponent(cleanModel)}:generateContent?key=${encodeURIComponent(apiKey)}`;
   const generationConfig: Record<string, unknown> = {
     temperature: 0.1,
     responseMimeType: 'application/json'
   };
-  if (model.includes('2.5')) {
+  if (cleanModel.includes('2.5')) {
     generationConfig.thinkingConfig = { thinkingBudget: 0 };
   }
 
@@ -56,34 +90,42 @@ async function callGeminiEndpoint(
 async function callGeminiJson(
   prompt: string,
   apiKey: string,
-  model = 'gemini-2.0-flash',
+  model = 'gemini-2.5-flash',
   baseUrl?: string
 ): Promise<string> {
-  const candidateEndpoints = baseUrl
-    ? [{ url: baseUrl, model }]
+  const primaryModel = normalizeGeminiModelName(model);
+  const fallbackModels = Array.from(
+    new Set([primaryModel, 'gemini-2.5-flash', 'gemini-3.8-flash', 'gemini-flash-latest'])
+  );
+
+  const baseUrls = baseUrl
+    ? [baseUrl]
     : apiKey.startsWith('AQ.')
       ? [
-          {
-            url: 'https://aiplatform.googleapis.com/v1/publishers/google',
-            model: model === 'gemini-2.0-flash' ? 'gemini-2.5-flash' : model
-          },
-          { url: 'https://generativelanguage.googleapis.com/v1beta', model }
+          'https://aiplatform.googleapis.com/v1/publishers/google',
+          'https://generativelanguage.googleapis.com/v1beta'
         ]
-      : [{ url: 'https://generativelanguage.googleapis.com/v1beta', model }];
+      : ['https://generativelanguage.googleapis.com/v1beta'];
 
   let lastStatus = 500;
   let lastErrText = '';
 
-  for (const candidate of candidateEndpoints) {
-    const res = await callGeminiEndpoint(prompt, apiKey, candidate.model, candidate.url);
-    if (res.ok) {
-      const data = (await res.json()) as {
-        candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
-      };
-      return data.candidates?.[0]?.content?.parts?.[0]?.text || '[]';
+  for (const bUrl of baseUrls) {
+    for (const candidateModel of fallbackModels) {
+      const res = await callGeminiEndpoint(prompt, apiKey, candidateModel, bUrl);
+      if (res.ok) {
+        const data = (await res.json()) as {
+          candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+        };
+        return data.candidates?.[0]?.content?.parts?.[0]?.text || '[]';
+      }
+      lastStatus = res.status;
+      lastErrText = await res.text().catch(() => '');
+      // Only try next model in same baseUrl if model was not found (404) or invalid model argument (400)
+      if (res.status !== 404 && res.status !== 400) {
+        break;
+      }
     }
-    lastStatus = res.status;
-    lastErrText = await res.text().catch(() => '');
   }
 
   throw new Error(`Gemini API error (${lastStatus}): ${lastErrText.slice(0, 800)}`);
@@ -194,18 +236,24 @@ async function translateBatch(
     throw new Error(`Missing API key for AI provider: ${options.aiProvider}`);
   }
 
+  const effectiveProvider = resolveEffectiveProvider(
+    options.aiProvider,
+    apiKey,
+    options.baseUrl
+  );
+
   const rawJson =
-    options.aiProvider === 'openai'
+    effectiveProvider === 'openai'
       ? await callOpenAiJson(
           prompt,
           apiKey,
-          options.model || 'gpt-4o-mini',
+          options.model && !options.model.startsWith('gemini-') ? options.model : 'gpt-4o-mini',
           options.baseUrl || 'https://api.openai.com/v1'
         )
       : await callGeminiJson(
           prompt,
           apiKey,
-          options.model || 'gemini-2.0-flash',
+          options.model || 'gemini-2.5-flash',
           options.baseUrl
         );
 
@@ -291,18 +339,24 @@ async function annotateBatch(
     throw new Error(`Missing API key for AI provider: ${options.aiProvider}`);
   }
 
+  const effectiveProvider = resolveEffectiveProvider(
+    options.aiProvider,
+    apiKey,
+    options.baseUrl
+  );
+
   const rawJson =
-    options.aiProvider === 'openai'
+    effectiveProvider === 'openai'
       ? await callOpenAiJson(
           prompt,
           apiKey,
-          options.model || 'gpt-4o-mini',
+          options.model && !options.model.startsWith('gemini-') ? options.model : 'gpt-4o-mini',
           options.baseUrl || 'https://api.openai.com/v1'
         )
       : await callGeminiJson(
           prompt,
           apiKey,
-          options.model || 'gemini-2.0-flash',
+          options.model || 'gemini-2.5-flash',
           options.baseUrl
         );
 

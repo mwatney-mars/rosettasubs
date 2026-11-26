@@ -962,7 +962,7 @@ export function renderConfigurePage(config: AddonConfig, baseUrl: string): strin
 
             <label class="field">
               <span>Model override</span>
-              <input type="text" id="aiModel" placeholder="gemini-2.0-flash" />
+              <input type="text" id="aiModel" placeholder="gemini-2.5-flash" />
             </label>
           </div>
         </div>
@@ -1264,7 +1264,7 @@ export function renderConfigurePage(config: AddonConfig, baseUrl: string): strin
       } else {
         aiKeyHelpLink.href = 'https://aistudio.google.com/apikey';
         aiKeyHelpLink.innerHTML = 'Get Gemini key &nearr;';
-        aiModel.placeholder = 'gemini-2.0-flash';
+        aiModel.placeholder = 'gemini-2.5-flash';
       }
 
       // Update live cinema preview
