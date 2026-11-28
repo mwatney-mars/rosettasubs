@@ -13,6 +13,7 @@ export function renderDashboardPage(): string {
       --card: #19191b;
       --raised: #232325;
       --bar-neutral: #2c2c30;
+      --bar-current: #52525b;
       --hairline: rgba(237, 237, 237, 0.08);
       --text: #ededed;
       --text-secondary: #a1a1a6;
@@ -211,15 +212,55 @@ export function renderDashboardPage(): string {
       min-width: 2px;
       background: var(--bar-neutral);
       border-radius: 2px 2px 0 0;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
       transition: opacity 120ms var(--ease);
     }
 
     .bar-col.current {
+      background: var(--bar-current);
+    }
+
+    .bar-seg-render {
+      width: 100%;
       background: var(--accent);
+      min-height: 2px;
+      flex-shrink: 0;
     }
 
     .bar-col:hover {
       opacity: 0.8;
+    }
+
+    .chart-meta {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .chart-legend {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 12px;
+      line-height: 16px;
+      color: var(--text-secondary);
+    }
+
+    .legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .legend-swatch {
+      width: 8px;
+      height: 8px;
+      border-radius: 2px;
+      display: inline-block;
     }
 
     .chart-axis {
@@ -406,7 +447,13 @@ export function renderDashboardPage(): string {
       <div class="card">
         <h2>
           <span>Requests per minute (last 60 minutes)</span>
-          <span id="statusSummary" class="meta-status"></span>
+          <span class="chart-meta">
+            <span class="chart-legend">
+              <span class="legend-item"><span class="legend-swatch" style="background: var(--bar-current)"></span>Direct</span>
+              <span class="legend-item"><span class="legend-swatch" style="background: var(--accent)"></span>Render</span>
+            </span>
+            <span id="statusSummary" class="meta-status"></span>
+          </span>
         </h2>
         <div id="barsContainer" class="bars"></div>
         <div class="chart-axis">
@@ -554,7 +601,28 @@ export function renderDashboardPage(): string {
           col.className = 'bar-col' + (isCurrent ? ' current' : '');
           const pct = b.requests === 0 ? 2 : Math.max(6, Math.round((b.requests / maxReq) * 100));
           col.style.height = pct + '%';
-          col.title = b.label + ' UTC — ' + b.requests + ' reqs (' + fmtBytes(b.bytesSent) + ', ' + b.uniqueUsers + ' users)';
+          const renderReqs = b.renderRequests || 0;
+          if (renderReqs > 0 && b.requests > 0) {
+            const renderSeg = document.createElement('div');
+            renderSeg.className = 'bar-seg-render';
+            const renderPct = Math.min(100, Math.max(12, Math.round((renderReqs / b.requests) * 100)));
+            renderSeg.style.height = renderPct + '%';
+            col.appendChild(renderSeg);
+          }
+          const directReqs = Math.max(0, b.requests - renderReqs);
+          col.title =
+            b.label +
+            ' UTC — ' +
+            b.requests +
+            ' reqs (' +
+            directReqs +
+            ' direct, ' +
+            renderReqs +
+            ' via Render • ' +
+            fmtBytes(b.bytesSent) +
+            ', ' +
+            b.uniqueUsers +
+            ' users)';
           barsEl.appendChild(col);
         });
         if (d.timeline60m.length > 0) {
