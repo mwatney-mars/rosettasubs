@@ -4,6 +4,7 @@ import { createApp, createStatsApp } from './app';
 
 dns.setDefaultResultOrder('ipv4first');
 import { getDefaultConfig } from './config';
+import { searchCache } from './cache';
 import { metrics } from './metrics';
 import { fetchRawSubtitles, parseStremioSubtitleRequest } from './providers';
 
@@ -53,6 +54,7 @@ if (!isRenderEdge) {
 for (const sig of ['SIGINT', 'SIGTERM'] as const) {
   process.on(sig, () => {
     metrics.flushToDisk();
+    searchCache.flushToDisk();
     process.exit(0);
   });
 }

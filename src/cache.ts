@@ -243,10 +243,97 @@ export class PersistentSubtitleCache extends TTLCache<string> {
   }
 }
 
+export class PersistentSearchCache extends TTLCache<unknown> {
+  private readonly persistFile: string | null;
+  private dirty = false;
+
+  constructor(defaultTtlMs: number, maxEntries: number, persistFile?: string | null) {
+    super(defaultTtlMs, maxEntries);
+    const isRenderEdge = Boolean(process.env.REDIRECT_TO_URL || process.env.RENDER === 'true');
+    if (persistFile !== undefined) {
+      this.persistFile = persistFile;
+    } else if (process.env.NODE_ENV === 'test' || isRenderEdge) {
+      this.persistFile = null;
+    } else {
+      this.persistFile = process.env.SEARCH_CACHE_FILE || '/data/cache/search-cache.json.gz';
+    }
+
+    if (this.persistFile) {
+      this.loadFromDisk();
+      const timer = setInterval(() => this.flushToDisk(), 30_000);
+      timer.unref();
+    }
+  }
+
+  override get(key: string): unknown {
+    const val = super.get(key);
+    this.dirty = true;
+    return val;
+  }
+
+  override set(key: string, value: unknown, ttlMs: number = this.defaultTtlMs): void {
+    super.set(key, value, ttlMs);
+    this.dirty = true;
+  }
+
+  private loadFromDisk(): void {
+    if (!this.persistFile) return;
+    try {
+      if (!fs.existsSync(this.persistFile)) return;
+      const gz = fs.readFileSync(this.persistFile);
+      const raw = zlib.gunzipSync(gz).toString('utf8');
+      const data = JSON.parse(raw) as {
+        hits?: number;
+        misses?: number;
+        entries?: Array<[string, CacheEntry<unknown>]>;
+      };
+      if (typeof data.hits === 'number') this.hits = data.hits;
+      if (typeof data.misses === 'number') this.misses = data.misses;
+      const now = Date.now();
+      if (Array.isArray(data.entries)) {
+        for (const [k, entry] of data.entries) {
+          if (entry && typeof entry.expiresAt === 'number' && entry.expiresAt > now) {
+            this.store.set(k, entry);
+          }
+        }
+      }
+    } catch {
+      // ignore corrupt cache file
+    }
+  }
+
+  public flushToDisk(): void {
+    if (!this.persistFile || !this.dirty) return;
+    try {
+      const dir = path.dirname(this.persistFile);
+      fs.mkdirSync(dir, { recursive: true });
+      const now = Date.now();
+      const validEntries: Array<[string, CacheEntry<unknown>]> = [];
+      for (const [k, v] of this.store.entries()) {
+        if (v.expiresAt > now) {
+          validEntries.push([k, v]);
+        }
+      }
+      const payload = JSON.stringify({
+        hits: this.hits,
+        misses: this.misses,
+        entries: validEntries.slice(-this.maxEntries)
+      });
+      const gz = zlib.gzipSync(Buffer.from(payload, 'utf8'), { level: 1 });
+      const tmp = `${this.persistFile}.tmp`;
+      fs.writeFileSync(tmp, gz);
+      fs.renameSync(tmp, this.persistFile);
+      this.dirty = false;
+    } catch {
+      // ignore write error
+    }
+  }
+}
+
 const defaultTtl = Number(process.env.CACHE_TTL_MS) || 6 * 60 * 60 * 1000;
 const searchCacheMax = Number(process.env.SEARCH_CACHE_MAX) || 10000;
 const subtitleCacheMax = Number(process.env.SUBTITLE_CACHE_MAX) || 2000;
-export const searchCache = new TTLCache<unknown>(defaultTtl, searchCacheMax);
+export const searchCache = new PersistentSearchCache(defaultTtl, searchCacheMax);
 export const subtitleContentCache = new PersistentSubtitleCache(
   24 * 60 * 60 * 1000,
   subtitleCacheMax

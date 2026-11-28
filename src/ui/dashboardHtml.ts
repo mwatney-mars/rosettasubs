@@ -154,13 +154,12 @@ export function renderDashboardPage(): string {
 
     .kpi-sub {
       font-size: 12px;
-      line-height: 16px;
+      line-height: 18px;
       color: var(--muted);
       font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
       font-variant-numeric: tabular-nums;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
+      white-space: normal;
+      word-break: break-word;
     }
 
     .kpi-sub strong {
@@ -434,7 +433,7 @@ export function renderDashboardPage(): string {
       <div class="card">
         <div class="kpi-label">Cache hit rate</div>
         <div id="kpiCacheHit" class="kpi-value">0%</div>
-        <div class="kpi-sub">Search <strong id="kpiSearchCache">0</strong> • SRT <strong id="kpiSubCache">0</strong> • RSS <strong id="kpiRam">0 MB</strong></div>
+        <div class="kpi-sub">Search <strong id="kpiSearchCache">0</strong> • Disk <strong id="kpiSubCache">0</strong> • RAM <strong id="kpiRam">0 MB</strong></div>
       </div>
       <div class="card">
         <div class="kpi-label">Render redirects</div>
@@ -578,12 +577,11 @@ export function renderDashboardPage(): string {
         document.getElementById('kpiP95Ms').textContent = d.traffic.p95LatencyMs + ' ms';
 
         document.getElementById('kpiCacheHit').textContent = d.cache.hitRatePercent + '%';
-        document.getElementById('kpiSearchCache').textContent = d.cache.search.size + '/' + d.cache.search.maxEntries;
-        const diskInfo = d.cache.subtitles.diskFiles
-          ? ' (Disk ' + d.cache.subtitles.diskFiles + ' • ' + fmtBytes(d.cache.subtitles.diskBytes || 0) + ')'
-          : '';
+        document.getElementById('kpiSearchCache').textContent = d.cache.search.size.toLocaleString();
+        const diskFiles = d.cache.subtitles.diskFiles || 0;
+        const diskBytes = d.cache.subtitles.diskBytes || 0;
         document.getElementById('kpiSubCache').textContent =
-          d.cache.subtitles.size + '/' + d.cache.subtitles.maxEntries + diskInfo;
+          diskFiles.toLocaleString() + ' (' + fmtBytes(diskBytes) + ')';
         document.getElementById('kpiRam').textContent = Math.round(d.system.rssBytes / (1024 * 1024)) + ' MB';
 
         if (d.render) {
