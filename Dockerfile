@@ -9,6 +9,7 @@ RUN npm run build
 FROM node:20-alpine
 WORKDIR /app
 ENV NODE_ENV=production
+ENV NODE_OPTIONS=--dns-result-order=ipv4first
 ENV PORT=7000
 ENV STATS_PORT=7001
 COPY package*.json ./

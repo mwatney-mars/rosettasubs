@@ -426,6 +426,57 @@ describe('Express Stremio Add-on Routes & Multimodal AI Flow', () => {
     expect(calledUrls.some((u) => u.includes('api.openai.com'))).toBe(false);
   });
 
+  it('falls back across Gemini models on 429/503, coalesces concurrent requests, and falls back to keyless translation when all AI quotas are exhausted', async () => {
+    let geminiCalls = 0;
+    let gtxCalls = 0;
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = String(input);
+      if (url === 'https://example.com/quota-test.srt') {
+        return new Response('1\n00:00:01,000 --> 00:00:03,000\nHello world\n', {
+          status: 200
+        });
+      }
+      if (url.includes('generativelanguage.googleapis.com')) {
+        geminiCalls++;
+        return new Response(
+          JSON.stringify({
+            error: { code: 429, message: 'You exceeded your current quota' }
+          }),
+          { status: 429, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+      if (url.includes('clients5.google.com/translate_a/t')) {
+        gtxCalls++;
+        return new Response(JSON.stringify(['Salut Lume']), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+      return new Response('', { status: 404 });
+    });
+
+    const token = encodeTranslateToken({
+      src: { u: 'https://example.com/quota-test.srt', f: 'srt' },
+      fromLang: 'eng',
+      toLang: 'ron',
+      aiProvider: 'gemini',
+      aiApiKey: 'AIzaSy_exhausted_quota_key'
+    });
+
+    const [res1, res2] = await Promise.all([
+      request(app).get(`/translate/${token}.srt`),
+      request(app).get(`/translate/${token}.srt`)
+    ]);
+
+    expect(res1.status).toBe(200);
+    expect(res2.status).toBe(200);
+    expect(res1.text).toContain('Salut Lume');
+    expect(res2.text).toContain('Salut Lume');
+    // Multiple Gemini fallback models were attempted on 429, then keyless fallback succeeded once for both concurrent requests
+    expect(geminiCalls).toBeGreaterThan(1);
+    expect(gtxCalls).toBe(1);
+  });
+
   it('transcribes media via POST /api/multimodal/transcribe', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
       new Response(

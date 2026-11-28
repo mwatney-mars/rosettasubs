@@ -1,5 +1,5 @@
 import { AIProviderName, SrtCue } from '../types';
-import { getLanguageName } from '../languages';
+import { getLanguageName, toIso639_1 } from '../languages';
 import { normalizeToSrt, parseSrt, serializeSrt } from '../subtitleConverter';
 import { subtitleContentCache } from '../cache';
 
@@ -61,6 +61,30 @@ function resolveEffectiveProvider(
   return requested;
 }
 
+const geminiModelCooldowns = new Map<string, number>();
+
+function getModelCooldownKey(apiKey: string, model: string): string {
+  return `${apiKey.slice(-10)}:${model}`;
+}
+
+function isModelOnCooldown(apiKey: string, model: string): boolean {
+  const until = geminiModelCooldowns.get(getModelCooldownKey(apiKey, model));
+  if (!until) return false;
+  if (Date.now() >= until) {
+    geminiModelCooldowns.delete(getModelCooldownKey(apiKey, model));
+    return false;
+  }
+  return true;
+}
+
+function setModelCooldown(apiKey: string, model: string, durationMs: number): void {
+  geminiModelCooldowns.set(getModelCooldownKey(apiKey, model), Date.now() + durationMs);
+}
+
+export function clearModelCooldowns(): void {
+  geminiModelCooldowns.clear();
+}
+
 async function callGeminiEndpoint(
   prompt: string,
   apiKey: string,
@@ -71,6 +95,7 @@ async function callGeminiEndpoint(
   const url = `${baseUrl.replace(/\/+$/, '')}/models/${encodeURIComponent(cleanModel)}:generateContent?key=${encodeURIComponent(apiKey)}`;
   const generationConfig: Record<string, unknown> = {
     temperature: 0.1,
+    maxOutputTokens: 65536,
     responseMimeType: 'application/json'
   };
   if (cleanModel.includes('2.5')) {
@@ -94,9 +119,19 @@ async function callGeminiJson(
   baseUrl?: string
 ): Promise<string> {
   const primaryModel = normalizeGeminiModelName(model);
-  const fallbackModels = Array.from(
-    new Set([primaryModel, 'gemini-2.5-flash', 'gemini-3.8-flash', 'gemini-flash-latest'])
+  const allCandidates = Array.from(
+    new Set([
+      primaryModel,
+      'gemini-2.5-flash-lite',
+      'gemini-2.5-flash',
+      'gemini-3.8-flash',
+      'gemini-flash-lite-latest',
+      'gemini-flash-latest'
+    ])
   );
+  const readyModels = allCandidates.filter((m) => !isModelOnCooldown(apiKey, m));
+  const cooledModels = allCandidates.filter((m) => isModelOnCooldown(apiKey, m));
+  const fallbackModels = [...readyModels, ...cooledModels];
 
   const baseUrls = baseUrl
     ? [baseUrl]
@@ -112,7 +147,16 @@ async function callGeminiJson(
 
   for (const bUrl of baseUrls) {
     for (const candidateModel of fallbackModels) {
-      const res = await callGeminiEndpoint(prompt, apiKey, candidateModel, bUrl);
+      let res: Response;
+      try {
+        res = await callGeminiEndpoint(prompt, apiKey, candidateModel, bUrl);
+      } catch (netErr) {
+        lastStatus = 503;
+        lastErrText = netErr instanceof Error ? netErr.message : String(netErr);
+        setModelCooldown(apiKey, candidateModel, 30_000);
+        continue;
+      }
+
       if (res.ok) {
         const data = (await res.json()) as {
           candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
@@ -121,10 +165,17 @@ async function callGeminiJson(
       }
       lastStatus = res.status;
       lastErrText = await res.text().catch(() => '');
-      // Only try next model in same baseUrl if model was not found (404) or invalid model argument (400)
-      if (res.status !== 404 && res.status !== 400) {
-        break;
+
+      if (res.status === 404 || res.status === 400) {
+        setModelCooldown(apiKey, candidateModel, 3600_000);
+        continue;
       }
+      if (res.status === 429 || res.status >= 500) {
+        setModelCooldown(apiKey, candidateModel, 120_000);
+        continue;
+      }
+      // 401 / 403 invalid key or permission error on this baseUrl -> stop trying models on this baseUrl
+      break;
     }
   }
 
@@ -210,6 +261,58 @@ function parseJsonBatchResponse(rawText: string): CueBatchItem[] {
   return [];
 }
 
+async function translateBatchViaGoogleFree(
+  batch: SrtCue[],
+  fromLang: string,
+  toLang: string
+): Promise<Map<number, string>> {
+  const sl = toIso639_1(fromLang);
+  const tl = toIso639_1(toLang);
+  const chunkSize = 125;
+  const map = new Map<number, string>();
+
+  for (let i = 0; i < batch.length; i += chunkSize) {
+    const chunk = batch.slice(i, i + chunkSize);
+    const body = new URLSearchParams();
+    for (const cue of chunk) {
+      body.append('q', cue.text);
+    }
+    const url = `https://clients5.google.com/translate_a/t?client=dict-chrome-ex&sl=${encodeURIComponent(sl)}&tl=${encodeURIComponent(tl)}`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+      },
+      body: body.toString()
+    });
+    if (!res.ok) {
+      throw new Error(`Fallback translation HTTP ${res.status}`);
+    }
+    const data = (await res.json()) as unknown;
+    if (!Array.isArray(data) || data.length === 0) {
+      throw new Error('Invalid fallback translation payload');
+    }
+    for (let j = 0; j < chunk.length && j < data.length; j++) {
+      const item = data[j];
+      const translated =
+        typeof item === 'string'
+          ? item
+          : Array.isArray(item) && typeof item[0] === 'string'
+            ? item[0]
+            : '';
+      if (translated.trim()) {
+        map.set(chunk[j].index, translated);
+      }
+    }
+  }
+
+  if (map.size === 0 && batch.length > 0) {
+    throw new Error('Fallback translation returned empty output');
+  }
+  return map;
+}
+
 async function translateBatch(
   batch: SrtCue[],
   fromLangName: string,
@@ -242,29 +345,53 @@ async function translateBatch(
     options.baseUrl
   );
 
-  const rawJson =
-    effectiveProvider === 'openai'
-      ? await callOpenAiJson(
-          prompt,
-          apiKey,
-          options.model && !options.model.startsWith('gemini-') ? options.model : 'gpt-4o-mini',
-          options.baseUrl || 'https://api.openai.com/v1'
-        )
-      : await callGeminiJson(
-          prompt,
-          apiKey,
-          options.model || 'gemini-2.5-flash',
-          options.baseUrl
-        );
+  try {
+    const rawJson =
+      effectiveProvider === 'openai'
+        ? await callOpenAiJson(
+            prompt,
+            apiKey,
+            options.model && !options.model.startsWith('gemini-') ? options.model : 'gpt-4o-mini',
+            options.baseUrl || 'https://api.openai.com/v1'
+          )
+        : await callGeminiJson(
+            prompt,
+            apiKey,
+            options.model || 'gemini-2.5-flash',
+            options.baseUrl
+          );
 
-  const items = parseJsonBatchResponse(rawJson);
-  const map = new Map<number, string>();
-  for (const item of items) {
-    if (typeof item.i === 'number' && typeof item.t === 'string') {
-      map.set(item.i, item.t);
+    const items = parseJsonBatchResponse(rawJson);
+    const map = new Map<number, string>();
+    for (const item of items) {
+      if (typeof item.i === 'number' && typeof item.t === 'string') {
+        map.set(item.i, item.t);
+      }
     }
+    if (map.size > 0) {
+      return map;
+    }
+    throw new Error('AI translation returned empty JSON batch');
+  } catch (aiErr) {
+    const msg = aiErr instanceof Error ? aiErr.message : String(aiErr);
+    const isQuotaOrTransient =
+      msg.includes('(429)') ||
+      msg.includes('(500)') ||
+      msg.includes('(502)') ||
+      msg.includes('(503)') ||
+      msg.includes('(504)') ||
+      msg.includes('fetch failed') ||
+      msg.includes('empty JSON batch');
+
+    if (isQuotaOrTransient) {
+      try {
+        return await translateBatchViaGoogleFree(batch, options.fromLang, options.toLang);
+      } catch {
+        // Rethrow original AI error if free fallback also fails
+      }
+    }
+    throw aiErr;
   }
-  return map;
 }
 
 export async function translateSrtContent(options: TranslateOptions): Promise<string> {
@@ -273,7 +400,7 @@ export async function translateSrtContent(options: TranslateOptions): Promise<st
 
   const fromName = getLanguageName(options.fromLang);
   const toName = getLanguageName(options.toLang);
-  const batchSize = options.batchSize ?? 90;
+  const batchSize = options.batchSize ?? 250;
 
   const batches: SrtCue[][] = [];
   for (let i = 0; i < cues.length; i += batchSize) {
@@ -281,7 +408,7 @@ export async function translateSrtContent(options: TranslateOptions): Promise<st
   }
 
   const translatedMap = new Map<number, string>();
-  const concurrency = 16;
+  const concurrency = 3;
   let firstError: Error | undefined;
   let succeededBatches = 0;
 

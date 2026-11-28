@@ -1,5 +1,8 @@
 import 'dotenv/config';
+import dns from 'dns';
 import { createApp, createStatsApp } from './app';
+
+dns.setDefaultResultOrder('ipv4first');
 import { getDefaultConfig } from './config';
 import { metrics } from './metrics';
 import { fetchRawSubtitles, parseStremioSubtitleRequest } from './providers';

@@ -238,6 +238,8 @@ export function createApp() {
     }
   });
 
+  const inFlightJobs = new Map<string, Promise<string>>();
+
   app.get('/translate/:token', async (req: Request, res: Response) => {
     const payload = decodeTranslateToken(req.params.token);
     if (!payload || !payload.src || !payload.toLang) {
@@ -254,21 +256,33 @@ export function createApp() {
       return;
     }
 
-    try {
-      const sourceSrt = await fetchAndNormalizeSubtitle(payload.src);
-      const translatedSrt = await translateSrtContent({
-        srtContent: sourceSrt,
-        fromLang: payload.fromLang,
-        toLang: payload.toLang,
-        aiProvider: payload.aiProvider,
-        apiKey: payload.aiApiKey,
-        model: payload.aiModel,
-        baseUrl: payload.aiBaseUrl
-      });
+    let job = inFlightJobs.get(cacheKey);
+    if (!job) {
+      job = (async () => {
+        const sourceSrt = await fetchAndNormalizeSubtitle(payload.src);
+        const translatedSrt = await translateSrtContent({
+          srtContent: sourceSrt,
+          fromLang: payload.fromLang,
+          toLang: payload.toLang,
+          aiProvider: payload.aiProvider,
+          apiKey: payload.aiApiKey,
+          model: payload.aiModel,
+          baseUrl: payload.aiBaseUrl
+        });
 
-      if (translatedSrt.trim()) {
-        subtitleContentCache.set(cacheKey, translatedSrt);
-      }
+        if (translatedSrt.trim()) {
+          subtitleContentCache.set(cacheKey, translatedSrt);
+        }
+        return translatedSrt;
+      })();
+      inFlightJobs.set(cacheKey, job);
+      void job.catch(() => {}).finally(() => {
+        inFlightJobs.delete(cacheKey);
+      });
+    }
+
+    try {
+      const translatedSrt = await job;
 
       logEvent(
         `[TRANSLATE-OK] provider=${payload.aiProvider} ${payload.fromLang}->${payload.toLang} u=${payload.src.u} bytes=${Buffer.byteLength(translatedSrt, 'utf8')}`
@@ -279,7 +293,7 @@ export function createApp() {
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Subtitle translation failed';
       logEvent(
-        `[TRANSLATE-ERR] provider=${payload.aiProvider} ${payload.fromLang}->${payload.toLang} u=${payload.src.u} err="${msg.replace(/\s+/g, ' ').slice(0, 300)}"`
+        `[TRANSLATE-ERR] provider=${payload.aiProvider} ${payload.fromLang}->${payload.toLang} u=${payload.src.u} err="${msg.replace(/\s+/g, ' ').slice(0, 500)}"`
       );
       res.status(502).send(msg);
     }
@@ -318,43 +332,21 @@ export function createApp() {
       return;
     }
 
-    try {
-      const aiProvider = payload.aiProvider || 'gemini';
-      let primarySrt = '';
-      let secondarySrt = '';
+    let job = inFlightJobs.get(cacheKey);
+    if (!job) {
+      job = (async () => {
+        const aiProvider = payload.aiProvider || 'gemini';
+        let primarySrt = '';
+        let secondarySrt = '';
 
-      if (payload.primary && payload.secondary) {
-        [primarySrt, secondarySrt] = await Promise.all([
-          fetchAndNormalizeSubtitle(payload.primary),
-          fetchAndNormalizeSubtitle(payload.secondary)
-        ]);
-      } else if (payload.primary) {
-        primarySrt = await fetchAndNormalizeSubtitle(payload.primary);
-        secondarySrt = await translateSrtContent({
-          srtContent: primarySrt,
-          fromLang: payload.primaryLang,
-          toLang: payload.secondaryLang,
-          aiProvider,
-          apiKey: payload.aiApiKey,
-          model: payload.aiModel,
-          baseUrl: payload.aiBaseUrl
-        });
-      } else if (payload.secondary) {
-        secondarySrt = await fetchAndNormalizeSubtitle(payload.secondary);
-        primarySrt = await translateSrtContent({
-          srtContent: secondarySrt,
-          fromLang: payload.secondaryLang,
-          toLang: payload.primaryLang,
-          aiProvider,
-          apiKey: payload.aiApiKey,
-          model: payload.aiModel,
-          baseUrl: payload.aiBaseUrl
-        });
-      }
-
-      if (payload.annotate) {
-        try {
-          primarySrt = await annotateSrtIdioms({
+        if (payload.primary && payload.secondary) {
+          [primarySrt, secondarySrt] = await Promise.all([
+            fetchAndNormalizeSubtitle(payload.primary),
+            fetchAndNormalizeSubtitle(payload.secondary)
+          ]);
+        } else if (payload.primary) {
+          primarySrt = await fetchAndNormalizeSubtitle(payload.primary);
+          secondarySrt = await translateSrtContent({
             srtContent: primarySrt,
             fromLang: payload.primaryLang,
             toLang: payload.secondaryLang,
@@ -363,18 +355,52 @@ export function createApp() {
             model: payload.aiModel,
             baseUrl: payload.aiBaseUrl
           });
-        } catch (annErr) {
-          const annMsg = annErr instanceof Error ? annErr.message : String(annErr);
-          logEvent(
-            `[DUAL-WARN] annotate failed (${payload.primaryLang}->${payload.secondaryLang}), serving unannotated dual track: "${annMsg.replace(/\s+/g, ' ').slice(0, 200)}"`
-          );
+        } else if (payload.secondary) {
+          secondarySrt = await fetchAndNormalizeSubtitle(payload.secondary);
+          primarySrt = await translateSrtContent({
+            srtContent: secondarySrt,
+            fromLang: payload.secondaryLang,
+            toLang: payload.primaryLang,
+            aiProvider,
+            apiKey: payload.aiApiKey,
+            model: payload.aiModel,
+            baseUrl: payload.aiBaseUrl
+          });
         }
-      }
 
-      const merged = mergeDualSrt(primarySrt, secondarySrt);
-      if (merged.trim()) {
-        subtitleContentCache.set(cacheKey, merged);
-      }
+        if (payload.annotate) {
+          try {
+            primarySrt = await annotateSrtIdioms({
+              srtContent: primarySrt,
+              fromLang: payload.primaryLang,
+              toLang: payload.secondaryLang,
+              aiProvider,
+              apiKey: payload.aiApiKey,
+              model: payload.aiModel,
+              baseUrl: payload.aiBaseUrl
+            });
+          } catch (annErr) {
+            const annMsg = annErr instanceof Error ? annErr.message : String(annErr);
+            logEvent(
+              `[DUAL-WARN] annotate failed (${payload.primaryLang}->${payload.secondaryLang}), serving unannotated dual track: "${annMsg.replace(/\s+/g, ' ').slice(0, 200)}"`
+            );
+          }
+        }
+
+        const merged = mergeDualSrt(primarySrt, secondarySrt);
+        if (merged.trim()) {
+          subtitleContentCache.set(cacheKey, merged);
+        }
+        return merged;
+      })();
+      inFlightJobs.set(cacheKey, job);
+      void job.catch(() => {}).finally(() => {
+        inFlightJobs.delete(cacheKey);
+      });
+    }
+
+    try {
+      const merged = await job;
 
       logEvent(
         `[DUAL-OK] ${payload.primaryLang}+${payload.secondaryLang} bytes=${Buffer.byteLength(merged, 'utf8')}`
@@ -385,7 +411,7 @@ export function createApp() {
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Dual subtitle generation failed';
       logEvent(
-        `[DUAL-ERR] ${payload.primaryLang}+${payload.secondaryLang} u=${payload.primary?.u || payload.secondary?.u || '-'} err="${msg.replace(/\s+/g, ' ').slice(0, 300)}"`
+        `[DUAL-ERR] ${payload.primaryLang}+${payload.secondaryLang} u=${payload.primary?.u || payload.secondary?.u || '-'} err="${msg.replace(/\s+/g, ' ').slice(0, 500)}"`
       );
       res.status(502).send(msg);
     }

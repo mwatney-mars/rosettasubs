@@ -88,6 +88,8 @@ async function downloadAndDecodeSingleUrl(
   throw lastErr || new Error('Subtitle fetch failed');
 }
 
+const inFlightFetches = new Map<string, Promise<string>>();
+
 export async function fetchAndNormalizeSubtitle(
   payload: ProxyTokenPayload,
   timeoutMs = 12000
@@ -96,49 +98,61 @@ export async function fetchAndNormalizeSubtitle(
   const cached = subtitleContentCache.get(cacheKey);
   if (cached) return cached;
 
-  let primaryError: Error | undefined;
+  const existing = inFlightFetches.get(cacheKey);
+  if (existing) return existing;
 
-  try {
-    let targetUrl = payload.u;
-    if (targetUrl.startsWith('os://')) {
-      const fileId = targetUrl.replace(/^os:\/\//, '');
-      const resolved = await resolveOpenSubtitlesDownloadUrl(
-        fileId,
-        payload.osKey,
-        Math.min(timeoutMs, 6000)
-      );
-      if (!resolved) {
-        throw new Error(`Failed to resolve OpenSubtitles download link for file ${fileId}`);
+  const job = (async (): Promise<string> => {
+    let primaryError: Error | undefined;
+
+    try {
+      let targetUrl = payload.u;
+      if (targetUrl.startsWith('os://')) {
+        const fileId = targetUrl.replace(/^os:\/\//, '');
+        const resolved = await resolveOpenSubtitlesDownloadUrl(
+          fileId,
+          payload.osKey,
+          Math.min(timeoutMs, 6000)
+        );
+        if (!resolved) {
+          throw new Error(`Failed to resolve OpenSubtitles download link for file ${fileId}`);
+        }
+        targetUrl = resolved;
       }
-      targetUrl = resolved;
+
+      const srt = await downloadAndDecodeSingleUrl(
+        targetUrl,
+        payload.f,
+        payload.e,
+        payload.se,
+        payload.ep,
+        timeoutMs
+      );
+      subtitleContentCache.set(cacheKey, srt);
+      return srt;
+    } catch (err) {
+      primaryError = err instanceof Error ? err : new Error(String(err));
     }
 
-    const srt = await downloadAndDecodeSingleUrl(
-      targetUrl,
-      payload.f,
-      payload.e,
-      payload.se,
-      payload.ep,
-      timeoutMs
-    );
-    subtitleContentCache.set(cacheKey, srt);
-    return srt;
-  } catch (err) {
-    primaryError = err instanceof Error ? err : new Error(String(err));
-  }
+    if (payload.fb && !payload.fb.startsWith('os://')) {
+      const srt = await downloadAndDecodeSingleUrl(
+        payload.fb,
+        payload.fbf || 'srt',
+        'UTF-8',
+        payload.se,
+        payload.ep,
+        timeoutMs
+      );
+      subtitleContentCache.set(cacheKey, srt);
+      return srt;
+    }
 
-  if (payload.fb && !payload.fb.startsWith('os://')) {
-    const srt = await downloadAndDecodeSingleUrl(
-      payload.fb,
-      payload.fbf || 'srt',
-      'UTF-8',
-      payload.se,
-      payload.ep,
-      timeoutMs
-    );
-    subtitleContentCache.set(cacheKey, srt);
-    return srt;
-  }
+    throw primaryError || new Error('Subtitle fetch failed');
+  })();
 
-  throw primaryError || new Error('Subtitle fetch failed');
+  inFlightFetches.set(cacheKey, job);
+  try {
+    return await job;
+  } finally {
+    inFlightFetches.delete(cacheKey);
+  }
 }
