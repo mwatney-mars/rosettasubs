@@ -9,8 +9,8 @@ import { fetchRawSubtitles, parseStremioSubtitleRequest } from './providers';
 
 const port = Number(process.env.PORT) || 7000;
 const statsPort = Number(process.env.STATS_PORT) || 7001;
+const isRenderEdge = Boolean(process.env.REDIRECT_TO_URL || process.env.RENDER === 'true');
 const app = createApp();
-const statsApp = createStatsApp();
 
 const WARMUP_TARGETS: Array<[string, string]> = [
   ['movie', 'tt0111161'],
@@ -43,9 +43,12 @@ app.listen(port, '0.0.0.0', () => {
   void warmupPopularCache();
 });
 
-statsApp.listen(statsPort, '0.0.0.0', () => {
-  console.log(`Private Observability Dashboard listening on http://localhost:${statsPort}`);
-});
+if (!isRenderEdge) {
+  const statsApp = createStatsApp();
+  statsApp.listen(statsPort, '0.0.0.0', () => {
+    console.log(`Private Observability Dashboard listening on http://localhost:${statsPort}`);
+  });
+}
 
 for (const sig of ['SIGINT', 'SIGTERM'] as const) {
   process.on(sig, () => {

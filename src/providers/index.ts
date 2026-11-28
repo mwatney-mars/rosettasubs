@@ -214,9 +214,10 @@ export async function getStremioSubtitles(
   query: SubtitleQuery,
   config: AddonConfig,
   baseUrl: string,
-  options?: { descriptiveLang?: boolean }
+  options?: { descriptiveLang?: boolean; viaRender?: boolean }
 ): Promise<StremioSubtitle[]> {
   const descriptiveLang = Boolean(options?.descriptiveLang);
+  const viaSuffix = options?.viaRender ? '?via=render' : '';
   const nativeLang = config.dualSubtitlesNativeLang || 'eng';
   const effectiveQuery: SubtitleQuery =
     config.dualSubtitles && !query.languages.includes(nativeLang)
@@ -318,7 +319,7 @@ export async function getStremioSubtitles(
           .join(' • ');
         stremioSubs.push({
           id: `dual-${lang}-${nativeLang}-${bestPrimary.id}`,
-          url: `${cleanBaseUrl}/dual/${dualToken}.srt`,
+          url: `${cleanBaseUrl}/dual/${dualToken}.srt${viaSuffix}`,
           lang: descriptiveLang ? label : lang,
           label
         });
@@ -343,7 +344,7 @@ export async function getStremioSubtitles(
           const label = `${formatLangShort(lang)}+${formatLangShort(nativeLang)} • Dual + AI (${aiDisplayName})`;
           stremioSubs.push({
             id: `dual-ai-${lang}-${nativeLang}-${bestPrimary.id}`,
-            url: `${cleanBaseUrl}/dual/${dualToken}.srt`,
+            url: `${cleanBaseUrl}/dual/${dualToken}.srt${viaSuffix}`,
             lang: descriptiveLang ? label : lang,
             label
           });
@@ -367,7 +368,7 @@ export async function getStremioSubtitles(
           const label = `${formatLangShort(lang)}+${formatLangShort(nativeLang)} • Dual + AI (${aiDisplayName})`;
           stremioSubs.push({
             id: `dual-ai-${lang}-${nativeLang}-${bestSecondary.id}`,
-            url: `${cleanBaseUrl}/dual/${dualToken}.srt`,
+            url: `${cleanBaseUrl}/dual/${dualToken}.srt${viaSuffix}`,
             lang: descriptiveLang ? label : lang,
             label
           });
@@ -397,7 +398,7 @@ export async function getStremioSubtitles(
       if (needsProxy) {
         const fallbackSub = pickFallbackSub(sub, directFallbacks, fbIdx++);
         const proxyPayload = toProxyPayload(sub, query, config, fallbackSub);
-        url = `${cleanBaseUrl}/sub/${encodeProxyToken(proxyPayload)}.srt`;
+        url = `${cleanBaseUrl}/sub/${encodeProxyToken(proxyPayload)}.srt${viaSuffix}`;
       }
 
       const label = formatSubtitleLabel(sub);
@@ -464,7 +465,7 @@ export async function getStremioSubtitles(
           });
 
           const label = `${formatLangShort(targetLang)} • AI • ${formatLangShort(bestSource.lang)}→${formatLangShort(targetLang)}`;
-          const url = `${cleanBaseUrl}/translate/${translateToken}.srt`;
+          const url = `${cleanBaseUrl}/translate/${translateToken}.srt${viaSuffix}`;
           const aiId = `ai-${config.aiProvider}-${targetLang}-${bestSource.id}`;
 
           if (descriptiveLang && (byLang.get(targetLang) || []).length === 0) {

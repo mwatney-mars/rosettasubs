@@ -100,10 +100,14 @@ export function classifyRoute(reqPath: string): RouteCategory {
 }
 
 export function extractClientHashAndCountry(req: Request): { clientHash: string; country: string } {
+  const realIp = (req.headers['x-real-client-ip'] as string)?.trim();
+  const realCountry = (req.headers['x-real-client-country'] as string)?.trim();
   const cfIp = (req.headers['cf-connecting-ip'] as string)?.trim();
   const xff = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim();
-  const rawIp = cfIp || xff || req.socket?.remoteAddress || req.ip || 'unknown';
-  const country = ((req.headers['cf-ipcountry'] as string) || 'LAN').trim().toUpperCase();
+  const rawIp = realIp || cfIp || xff || req.socket?.remoteAddress || req.ip || 'unknown';
+  const country = (realCountry || (req.headers['cf-ipcountry'] as string) || 'LAN')
+    .trim()
+    .toUpperCase();
   const clientHash = crypto.createHash('sha256').update(rawIp).digest('hex').slice(0, 12);
   return { clientHash, country };
 }
@@ -163,11 +167,14 @@ class MetricsCollector {
 
   constructor() {
     this.persistPath = process.env.METRICS_FILE || '/data/metrics.json';
-    this.loadFromDisk();
+    const isRenderEdge = Boolean(process.env.REDIRECT_TO_URL || process.env.RENDER === 'true');
+    if (!isRenderEdge) {
+      this.loadFromDisk();
 
-    if (process.env.NODE_ENV !== 'test') {
-      const timer = setInterval(() => this.flushToDisk(), 10_000);
-      timer.unref();
+      if (process.env.NODE_ENV !== 'test') {
+        const timer = setInterval(() => this.flushToDisk(), 10_000);
+        timer.unref();
+      }
     }
   }
 

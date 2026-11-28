@@ -43,24 +43,84 @@ export function createApp() {
   app.use(cors());
   app.use(express.json({ limit: '25mb' }));
 
-  app.use((req: Request, res: Response, next) => {
+  app.use(async (req: Request, res: Response, next) => {
     const redirectBase = (
       process.env.REDIRECT_TO_URL ||
       (process.env.RENDER === 'true' ? 'https://rosettasubs.mwatney.com' : '')
     )
       .trim()
       .replace(/\/+$/, '');
-    if (!redirectBase || req.path === '/health') {
+    if (
+      !redirectBase ||
+      req.path === '/health' ||
+      req.path === '/robots.txt' ||
+      req.path === '/favicon.ico' ||
+      req.path === '/logo.svg'
+    ) {
       next();
       return;
     }
     const orig = req.originalUrl || '/';
     const sep = orig.includes('?') ? '&' : '?';
-    const targetUrl = orig.includes('via=render')
-      ? `${redirectBase}${orig}`
-      : `${redirectBase}${orig}${sep}via=render`;
-    res.setHeader('Cache-Control', 'public, max-age=3600');
-    res.redirect(307, targetUrl);
+    const targetPath =
+      req.path === '/'
+        ? '/configure'
+        : orig;
+    const targetSep = targetPath.includes('?') ? '&' : '?';
+    const targetUrl = targetPath.includes('via=render')
+      ? `${redirectBase}${targetPath}`
+      : `${redirectBase}${targetPath}${targetSep}via=render`;
+
+    const isConfigureUi = req.path === '/' || req.path === '/configure' || req.path.endsWith('/configure');
+    if (isConfigureUi) {
+      res.setHeader('Cache-Control', 'public, max-age=300');
+      res.redirect(307, targetUrl);
+      return;
+    }
+
+    // For Stremio Add-on API & Subtitle routes (/manifest.json, /subtitles/*, /sub/*, /translate/*, /dual/*),
+    // transparently proxy to the new backend so legacy Stremio clients on *.onrender.com work with 100%
+    // backward compatibility (no cross-origin redirect issues) while executing on rosettasubs.mwatney.com.
+    try {
+      const clientIp =
+        (req.headers['cf-connecting-ip'] as string)?.trim() ||
+        (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ||
+        req.socket?.remoteAddress ||
+        '';
+      const clientCountry = ((req.headers['cf-ipcountry'] as string) || '').trim();
+      const upstreamHeaders: Record<string, string> = {
+        Accept: (req.headers.accept as string) || '*/*',
+        'User-Agent': (req.headers['user-agent'] as string) || 'RosettaSubs-RenderProxy/1.1'
+      };
+      if (clientIp) upstreamHeaders['x-real-client-ip'] = clientIp;
+      if (clientCountry) upstreamHeaders['x-real-client-country'] = clientCountry;
+      if (req.headers['content-type']) {
+        upstreamHeaders['Content-Type'] = String(req.headers['content-type']);
+      }
+
+      const upstreamRes = await fetch(targetUrl, {
+        method: req.method,
+        headers: upstreamHeaders,
+        body:
+          req.method !== 'GET' && req.method !== 'HEAD' && req.body
+            ? JSON.stringify(req.body)
+            : undefined
+      });
+
+      const contentType = upstreamRes.headers.get('content-type');
+      if (contentType) res.setHeader('Content-Type', contentType);
+      const cacheControl = upstreamRes.headers.get('cache-control');
+      if (cacheControl) res.setHeader('Cache-Control', cacheControl);
+
+      const buf = Buffer.from(await upstreamRes.arrayBuffer());
+      res.status(upstreamRes.status).send(buf);
+    } catch {
+      const fallbackUrl = orig.includes('via=render')
+        ? `${redirectBase}${orig}`
+        : `${redirectBase}${orig}${sep}via=render`;
+      res.setHeader('Cache-Control', 'public, max-age=300');
+      res.redirect(307, fallbackUrl);
+    }
   });
 
   app.use((req: Request, res: Response, next) => {
@@ -184,7 +244,11 @@ export function createApp() {
       metrics.recordSubtitleQuery(type, query.imdbId, config.languages);
       const baseUrl = resolveBaseUrl(req);
       const descriptiveLang = req.query.descriptiveLang === '1';
-      const subtitles = await getStremioSubtitles(query, config, baseUrl, { descriptiveLang });
+      const viaRender = req.query.via === 'render';
+      const subtitles = await getStremioSubtitles(query, config, baseUrl, {
+        descriptiveLang,
+        viaRender
+      });
 
       logEvent(
         `[SUBTITLES] type=${type} id=${rawId} extra=${rawExtra || '-'} langs=${config.languages.join(',')} count=${subtitles.length} sample=${subtitles

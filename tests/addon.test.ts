@@ -620,15 +620,42 @@ describe('Express Stremio Add-on Routes & Multimodal AI Flow', () => {
     expect(publicBlocked.status).toBe(404);
   });
 
-  it('redirects all non-health requests with CORS headers when REDIRECT_TO_URL is set and tracks via=render in metrics', async () => {
+  it('redirects /configure to new frontend and proxies Stremio API requests to new backend when REDIRECT_TO_URL is set', async () => {
     process.env.REDIRECT_TO_URL = 'https://rosettasubs.mwatney.com/';
     try {
-      const redirectRes = await request(app).get('/subtitles/movie/tt0133093.json');
-      expect(redirectRes.status).toBe(307);
-      expect(redirectRes.headers.location).toBe(
-        'https://rosettasubs.mwatney.com/subtitles/movie/tt0133093.json?via=render'
+      const cfgRedirect = await request(app).get('/myconfig/configure');
+      expect(cfgRedirect.status).toBe(307);
+      expect(cfgRedirect.headers.location).toBe(
+        'https://rosettasubs.mwatney.com/myconfig/configure?via=render'
       );
-      expect(redirectRes.headers['access-control-allow-origin']).toBe('*');
+
+      vi.spyOn(globalThis, 'fetch').mockImplementationOnce(async (input) => {
+        expect(String(input)).toBe(
+          'https://rosettasubs.mwatney.com/subtitles/movie/tt0133093.json?via=render'
+        );
+        return new Response(
+          JSON.stringify({
+            subtitles: [
+              {
+                id: 'osv3-1',
+                url: 'https://rosettasubs.mwatney.com/sub/tok.srt?via=render',
+                lang: 'eng'
+              }
+            ]
+          }),
+          {
+            status: 200,
+            headers: { 'Content-Type': 'application/json; charset=utf-8' }
+          }
+        );
+      });
+
+      const proxiedSubRes = await request(app).get('/subtitles/movie/tt0133093.json');
+      expect(proxiedSubRes.status).toBe(200);
+      expect(proxiedSubRes.headers['access-control-allow-origin']).toBe('*');
+      expect(proxiedSubRes.body.subtitles[0].url).toBe(
+        'https://rosettasubs.mwatney.com/sub/tok.srt?via=render'
+      );
 
       const healthRes = await request(app).get('/health');
       expect(healthRes.status).toBe(200);
