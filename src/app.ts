@@ -317,6 +317,7 @@ export function createApp() {
       subtitleContentCache.get(cacheKey) ||
       (!payload.aiApiKey ? subtitleContentCache.get(sharedKey) : undefined);
     if (cached) {
+      metrics.recordTranslation('cacheHit', 1, false);
       res.setHeader('Content-Type', 'application/x-subrip; charset=utf-8');
       res.setHeader('Cache-Control', 'public, max-age=86400');
       res.send(cached);
@@ -394,6 +395,7 @@ export function createApp() {
 
     const cached = subtitleContentCache.get(cacheKey);
     if (cached) {
+      metrics.recordTranslation('cacheHit', 1, false);
       res.setHeader('Content-Type', 'application/x-subrip; charset=utf-8');
       res.setHeader('Cache-Control', 'public, max-age=86400');
       res.send(cached);

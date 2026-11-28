@@ -2,6 +2,7 @@ import { AIProviderName, SrtCue } from '../types';
 import { getLanguageName, toIso639_1 } from '../languages';
 import { normalizeToSrt, parseSrt, serializeSrt } from '../subtitleConverter';
 import { subtitleContentCache } from '../cache';
+import { metrics } from '../metrics';
 
 export interface TranslateOptions {
   srtContent: string;
@@ -336,7 +337,15 @@ async function translateBatch(
       : process.env.GEMINI_API_KEY);
 
   if (!apiKey) {
-    return translateBatchViaGoogleFree(batch, options.fromLang, options.toLang);
+    const t0 = Date.now();
+    try {
+      const res = await translateBatchViaGoogleFree(batch, options.fromLang, options.toLang);
+      metrics.recordTranslation('freeBuiltIn', Date.now() - t0, false);
+      return res;
+    } catch (err) {
+      metrics.recordTranslation('freeBuiltIn', Date.now() - t0, true);
+      throw err;
+    }
   }
 
   const effectiveProvider = resolveEffectiveProvider(
@@ -344,6 +353,8 @@ async function translateBatch(
     apiKey,
     options.baseUrl
   );
+  const byokEngine = effectiveProvider === 'openai' ? 'openaiByok' : 'geminiByok';
+  const t0 = Date.now();
 
   try {
     const rawJson =
@@ -369,6 +380,7 @@ async function translateBatch(
       }
     }
     if (map.size > 0) {
+      metrics.recordTranslation(byokEngine, Date.now() - t0, false);
       return map;
     }
     throw new Error('AI translation returned empty JSON batch');
@@ -384,12 +396,16 @@ async function translateBatch(
       msg.includes('empty JSON batch');
 
     if (isQuotaOrTransient) {
+      const fbT0 = Date.now();
       try {
-        return await translateBatchViaGoogleFree(batch, options.fromLang, options.toLang);
+        const res = await translateBatchViaGoogleFree(batch, options.fromLang, options.toLang);
+        metrics.recordTranslation('quotaFallback', Date.now() - fbT0, false);
+        return res;
       } catch {
         // Rethrow original AI error if free fallback also fails
       }
     }
+    metrics.recordTranslation(byokEngine, Date.now() - t0, true);
     throw aiErr;
   }
 }

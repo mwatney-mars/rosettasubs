@@ -51,6 +51,28 @@ export interface RecentRequestEvent {
   viaRender: boolean;
 }
 
+export type TranslationEngineName =
+  | 'cacheHit'
+  | 'freeBuiltIn'
+  | 'geminiByok'
+  | 'openaiByok'
+  | 'quotaFallback';
+
+export interface TranslationEngineMetrics {
+  count: number;
+  errors: number;
+  totalMs: number;
+}
+
+export type UpstreamProviderMetricName = 'wyzie' | 'osv3' | 'opensubtitles' | 'subdl';
+
+export interface UpstreamProviderMetrics {
+  requests: number;
+  errors: number;
+  resultsReturned: number;
+  totalMs: number;
+}
+
 interface PersistedMetrics {
   startedAt: number;
   totalRequests: number;
@@ -60,10 +82,13 @@ interface PersistedMetrics {
   renderOffloadedBytes?: number;
   byRoute: Record<RouteCategory, RouteMetrics>;
   byStatus: Record<'2xx' | '3xx' | '4xx' | '5xx', number>;
+  translationStats?: Record<TranslationEngineName, TranslationEngineMetrics>;
+  providerStats?: Record<UpstreamProviderMetricName, UpstreamProviderMetrics>;
   users: Array<[string, UserRecord]>;
   topLanguages: Array<[string, number]>;
   topMedia: Array<[string, { imdbId: string; type: string; count: number; lastSeen: number }]>;
   recentEvents?: RecentRequestEvent[];
+  recentErrors?: RecentRequestEvent[];
   minuteBuckets?: Array<
     [number, { minute: number; requests: number; renderRequests: number; bytesSent: number; users: string[] }]
   >;
@@ -80,10 +105,41 @@ const ROUTE_CATEGORIES: RouteCategory[] = [
   'other'
 ];
 
+const TRANSLATION_ENGINES: TranslationEngineName[] = [
+  'cacheHit',
+  'freeBuiltIn',
+  'geminiByok',
+  'openaiByok',
+  'quotaFallback'
+];
+
+const UPSTREAM_PROVIDERS: UpstreamProviderMetricName[] = [
+  'wyzie',
+  'osv3',
+  'opensubtitles',
+  'subdl'
+];
+
 function createEmptyRouteMap(): Record<RouteCategory, RouteMetrics> {
   const res = {} as Record<RouteCategory, RouteMetrics>;
   for (const r of ROUTE_CATEGORIES) {
     res[r] = { count: 0, bytesSent: 0, errors: 0, totalMs: 0 };
+  }
+  return res;
+}
+
+function createEmptyTranslationMap(): Record<TranslationEngineName, TranslationEngineMetrics> {
+  const res = {} as Record<TranslationEngineName, TranslationEngineMetrics>;
+  for (const k of TRANSLATION_ENGINES) {
+    res[k] = { count: 0, errors: 0, totalMs: 0 };
+  }
+  return res;
+}
+
+function createEmptyProviderMap(): Record<UpstreamProviderMetricName, UpstreamProviderMetrics> {
+  const res = {} as Record<UpstreamProviderMetricName, UpstreamProviderMetrics>;
+  for (const p of UPSTREAM_PROVIDERS) {
+    res[p] = { requests: 0, errors: 0, resultsReturned: 0, totalMs: 0 };
   }
   return res;
 }
@@ -153,6 +209,10 @@ class MetricsCollector {
     '4xx': 0,
     '5xx': 0
   };
+  private translationStats: Record<TranslationEngineName, TranslationEngineMetrics> =
+    createEmptyTranslationMap();
+  private providerStats: Record<UpstreamProviderMetricName, UpstreamProviderMetrics> =
+    createEmptyProviderMap();
   private users = new Map<string, UserRecord>();
   private topLanguages = new Map<string, number>();
   private topMedia = new Map<
@@ -162,6 +222,7 @@ class MetricsCollector {
   private minuteBuckets = new Map<number, MinuteBucket>();
   private recentLatencies: number[] = [];
   private recentEvents: RecentRequestEvent[] = [];
+  private recentErrors: RecentRequestEvent[] = [];
   private persistPath: string;
   private dirty = false;
 
@@ -205,6 +266,20 @@ class MetricsCollector {
       if (data.byStatus) {
         this.byStatus = { ...this.byStatus, ...data.byStatus };
       }
+      if (data.translationStats) {
+        for (const k of TRANSLATION_ENGINES) {
+          if (data.translationStats[k]) {
+            this.translationStats[k] = { ...this.translationStats[k], ...data.translationStats[k] };
+          }
+        }
+      }
+      if (data.providerStats) {
+        for (const p of UPSTREAM_PROVIDERS) {
+          if (data.providerStats[p]) {
+            this.providerStats[p] = { ...this.providerStats[p], ...data.providerStats[p] };
+          }
+        }
+      }
       if (Array.isArray(data.users)) {
         this.users = new Map(data.users.slice(-25000));
       }
@@ -216,6 +291,11 @@ class MetricsCollector {
       }
       if (Array.isArray(data.recentEvents)) {
         this.recentEvents = data.recentEvents.slice(0, 120);
+      }
+      if (Array.isArray(data.recentErrors)) {
+        this.recentErrors = data.recentErrors.slice(0, 200);
+      } else if (Array.isArray(data.recentEvents)) {
+        this.recentErrors = data.recentEvents.filter((e) => e.status >= 400).slice(0, 200);
       }
       if (Array.isArray(data.minuteBuckets)) {
         this.minuteBuckets = new Map(
@@ -252,10 +332,13 @@ class MetricsCollector {
         renderOffloadedBytes: this.renderOffloadedBytes,
         byRoute: this.byRoute,
         byStatus: this.byStatus,
+        translationStats: this.translationStats,
+        providerStats: this.providerStats,
         users: Array.from(this.users.entries()).slice(-25000),
         topLanguages: Array.from(this.topLanguages.entries()),
         topMedia: Array.from(this.topMedia.entries()).slice(-1000),
         recentEvents: this.recentEvents.slice(0, 120),
+        recentErrors: this.recentErrors.slice(0, 200),
         minuteBuckets: Array.from(this.minuteBuckets.entries()).map(([k, b]) => [
           k,
           {
@@ -362,7 +445,7 @@ class MetricsCollector {
 
     const shortPath =
       req.originalUrl.length > 180 ? `${req.originalUrl.slice(0, 180)}...` : req.originalUrl;
-    this.recentEvents.unshift({
+    const ev: RecentRequestEvent = {
       ts: new Date(now).toISOString(),
       method: req.method,
       path: shortPath,
@@ -373,11 +456,46 @@ class MetricsCollector {
       clientHash,
       country,
       viaRender
-    });
+    };
+    this.recentEvents.unshift(ev);
     if (this.recentEvents.length > 120) {
       this.recentEvents.pop();
     }
+    if (status >= 400) {
+      this.recentErrors.unshift(ev);
+      if (this.recentErrors.length > 200) {
+        this.recentErrors.pop();
+      }
+    }
 
+    this.dirty = true;
+  }
+
+  public recordTranslation(
+    engine: TranslationEngineName,
+    durationMs: number,
+    isError = false
+  ): void {
+    const entry = this.translationStats[engine];
+    if (!entry) return;
+    entry.count++;
+    entry.totalMs += Math.max(0, durationMs);
+    if (isError) entry.errors++;
+    this.dirty = true;
+  }
+
+  public recordProviderCall(
+    provider: UpstreamProviderMetricName,
+    durationMs: number,
+    resultsReturned: number,
+    isError = false
+  ): void {
+    const entry = this.providerStats[provider];
+    if (!entry) return;
+    entry.requests++;
+    entry.totalMs += Math.max(0, durationMs);
+    entry.resultsReturned += Math.max(0, resultsReturned);
+    if (isError) entry.errors++;
     this.dirty = true;
   }
 
@@ -477,6 +595,27 @@ class MetricsCollector {
 
     const mem = process.memoryUsage();
 
+    const byRouteWithWindow = {} as Record<
+      RouteCategory,
+      RouteMetrics & { errors1h: number; errors24h: number }
+    >;
+    for (const r of ROUTE_CATEGORIES) {
+      byRouteWithWindow[r] = {
+        ...this.byRoute[r],
+        errors1h: 0,
+        errors24h: 0
+      };
+    }
+    for (const errEv of this.recentErrors) {
+      const tsMs = Date.parse(errEv.ts);
+      if (Number.isNaN(tsMs)) continue;
+      const age = now - tsMs;
+      const routeEntry = byRouteWithWindow[errEv.route];
+      if (!routeEntry) continue;
+      if (age <= 3600_000) routeEntry.errors1h++;
+      if (age <= 24 * 3600_000) routeEntry.errors24h++;
+    }
+
     return {
       now: new Date(now).toISOString(),
       startedAt: new Date(this.startedAt).toISOString(),
@@ -501,8 +640,10 @@ class MetricsCollector {
         avgLatencyMs: avgMs,
         p95LatencyMs: p95Ms,
         byStatus: this.byStatus,
-        byRoute: this.byRoute
+        byRoute: byRouteWithWindow
       },
+      translations: this.translationStats,
+      providers: this.providerStats,
       render: {
         redirectRequests: this.renderRedirectRequests,
         redirectRequests60m: timeline60m.reduce((s, x) => s + x.renderRequests, 0),
@@ -528,7 +669,8 @@ class MetricsCollector {
         .sort((a, b) => b.count - a.count)
         .slice(0, 15),
       timeline60m,
-      recentEvents: this.recentEvents.slice(0, 60)
+      recentEvents: this.recentEvents.slice(0, 60),
+      recentErrors: this.recentErrors.slice(0, 60)
     };
   }
 }

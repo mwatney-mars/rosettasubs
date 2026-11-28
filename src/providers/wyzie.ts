@@ -1,6 +1,7 @@
 import { RawSubtitleResult, SubtitleQuery } from '../types';
 import { toIso639_1, toIso639_2 } from '../languages';
 import { searchCache } from '../cache';
+import { metrics } from '../metrics';
 import { scoreReleaseMatch } from './releaseScorer';
 
 interface WyzieSubItem {
@@ -54,6 +55,7 @@ async function searchStremioOsV3(
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
+    const t0 = Date.now();
 
     try {
       const res = await fetch(`${STREMIO_OSV3_BASE}${path}`, {
@@ -65,12 +67,17 @@ async function searchStremioOsV3(
       });
       if (res.ok) {
         const json = (await res.json()) as { subtitles?: StremioOsV3Item[] };
-        if (Array.isArray(json.subtitles) && json.subtitles.length > 0) {
-          rawSubs = json.subtitles;
+        const list = Array.isArray(json.subtitles) ? json.subtitles : [];
+        metrics.recordProviderCall('osv3', Date.now() - t0, list.length, false);
+        if (list.length > 0) {
+          rawSubs = list;
           searchCache.set(osv3CacheKey, rawSubs);
         }
+      } else {
+        metrics.recordProviderCall('osv3', Date.now() - t0, 0, true);
       }
     } catch {
+      metrics.recordProviderCall('osv3', Date.now() - t0, 0, true);
       return [];
     } finally {
       clearTimeout(timer);
@@ -134,6 +141,7 @@ export async function searchWyzie(
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
+    const t0 = Date.now();
 
     try {
       const res = await fetch(`${WYZIE_BASE_URL}/search?${params.toString()}`, {
@@ -146,12 +154,17 @@ export async function searchWyzie(
 
       if (res.ok) {
         const data = (await res.json()) as WyzieSubItem[];
-        if (Array.isArray(data) && data.length > 0) {
-          rawItems = data;
-          searchCache.set(upstreamCacheKey, data);
+        const list = Array.isArray(data) ? data : [];
+        metrics.recordProviderCall('wyzie', Date.now() - t0, list.length, false);
+        if (list.length > 0) {
+          rawItems = list;
+          searchCache.set(upstreamCacheKey, list);
         }
+      } else {
+        metrics.recordProviderCall('wyzie', Date.now() - t0, 0, true);
       }
     } catch {
+      metrics.recordProviderCall('wyzie', Date.now() - t0, 0, true);
       // Fallback to Stremio OpenSubtitles v3 below
     } finally {
       clearTimeout(timer);

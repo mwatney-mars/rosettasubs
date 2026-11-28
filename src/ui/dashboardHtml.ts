@@ -404,8 +404,34 @@ export function renderDashboardPage(): string {
 
     .table-scroll {
       flex: 1 1 auto;
-      max-height: 1120px;
+      max-height: 1380px;
       overflow-y: auto;
+    }
+
+    .filter-pills {
+      display: inline-flex;
+      gap: 4px;
+      background: var(--bg-deep);
+      padding: 2px;
+      border-radius: 6px;
+      border: 1px solid var(--hairline);
+    }
+
+    .filter-btn {
+      background: transparent;
+      border: 0;
+      color: var(--muted);
+      font-family: inherit;
+      font-size: 12px;
+      line-height: 16px;
+      padding: 3px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    .filter-btn.active {
+      background: var(--raised);
+      color: var(--text);
     }
   </style>
 </head>
@@ -482,7 +508,7 @@ export function renderDashboardPage(): string {
                 <th class="num">Reqs</th>
                 <th class="num">Egress</th>
                 <th class="num hide-sm">Avg</th>
-                <th class="num">Err</th>
+                <th class="num" title="Errors in last 1h (all-time historical errors in parentheses)">Err 1h (All)</th>
               </tr>
             </thead>
             <tbody id="routeTableBody"></tbody>
@@ -493,6 +519,14 @@ export function renderDashboardPage(): string {
 
     <div class="bottom-grid">
       <div class="side-stack">
+        <div class="card">
+          <h2>Translation engines</h2>
+          <div id="translationPills" class="rank-list"></div>
+        </div>
+        <div class="card">
+          <h2>Upstream providers</h2>
+          <div id="providerPills" class="rank-list"></div>
+        </div>
         <div class="card">
           <h2>Top languages</h2>
           <div id="langPills" class="rank-list"></div>
@@ -508,7 +542,13 @@ export function renderDashboardPage(): string {
       </div>
 
       <div class="card card-events">
-        <h2>Recent requests</h2>
+        <h2>
+          <span>Recent requests</span>
+          <span class="filter-pills">
+            <button type="button" id="filterAllBtn" class="filter-btn active">All</button>
+            <button type="button" id="filterErrBtn" class="filter-btn">Errors only</button>
+          </span>
+        </h2>
         <div class="table-scroll table-wrap">
           <table>
             <thead>
@@ -552,8 +592,67 @@ export function renderDashboardPage(): string {
       configure: 'Configure (/configure)',
       manifest: 'Manifest (/manifest.json)',
       transcribe: 'Transcribe (/api)',
-      other: 'Other'
+      other: 'Other (404)'
     };
+
+    const TRANSLATION_LABELS = {
+      cacheHit: 'Disk / RAM cache hit',
+      freeBuiltIn: 'Built-in free (Google)',
+      geminiByok: 'Gemini BYOK',
+      openaiByok: 'OpenAI BYOK',
+      quotaFallback: 'Quota fallback (Google)'
+    };
+
+    const PROVIDER_LABELS = {
+      osv3: 'OpenSubtitles v3 (Stremio)',
+      wyzie: 'Wyzie API',
+      opensubtitles: 'OpenSubtitles REST',
+      subdl: 'SubDL API'
+    };
+
+    let showErrorsOnly = false;
+    let lastSnapshot = null;
+
+    document.getElementById('filterAllBtn').addEventListener('click', () => {
+      showErrorsOnly = false;
+      document.getElementById('filterAllBtn').classList.add('active');
+      document.getElementById('filterErrBtn').classList.remove('active');
+      if (lastSnapshot) renderEventsTable(lastSnapshot);
+    });
+
+    document.getElementById('filterErrBtn').addEventListener('click', () => {
+      showErrorsOnly = true;
+      document.getElementById('filterErrBtn').classList.add('active');
+      document.getElementById('filterAllBtn').classList.remove('active');
+      if (lastSnapshot) renderEventsTable(lastSnapshot);
+    });
+
+    function renderEventsTable(d) {
+      const eventsBody = document.getElementById('eventsBody');
+      eventsBody.innerHTML = '';
+      const list = showErrorsOnly ? (d.recentErrors || []) : (d.recentEvents || []);
+      if (list.length === 0) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = '<td colspan="7" class="meta-status">' + (showErrorsOnly ? 'No errors recorded in buffer' : 'No requests yet') + '</td>';
+        eventsBody.appendChild(tr);
+        return;
+      }
+      list.forEach((ev) => {
+        const tr = document.createElement('tr');
+        const stClass = ev.status >= 500 ? 'status-err' : ev.status >= 400 ? 'status-warn' : 'status-ok';
+        const srcTag = ev.viaRender ? ' • <span class="status-warn">render</span>' : '';
+        const safePath = ev.path.replace(/</g, '&lt;').replace(/"/g, '&quot;');
+        tr.innerHTML =
+          '<td class="mono">' + ev.ts.slice(11, 19) + '</td>' +
+          '<td>' + ev.route + srcTag + '</td>' +
+          '<td class="mono path-cell" title="' + safePath + '">' + safePath + '</td>' +
+          '<td class="num ' + stClass + '">' + ev.status + '</td>' +
+          '<td class="num hide-sm">' + ev.durationMs + ' ms</td>' +
+          '<td class="num hide-sm">' + fmtBytes(ev.bytesSent) + '</td>' +
+          '<td class="mono">' + ev.country + ' • ' + ev.clientHash.slice(0, 8) + '</td>';
+        eventsBody.appendChild(tr);
+      });
+    }
 
     async function refresh() {
       const ind = document.getElementById('refreshIndicator');
@@ -648,14 +747,63 @@ export function renderDashboardPage(): string {
           if (rm.count === 0 && key === 'other') return;
           const tr = document.createElement('tr');
           const avg = rm.count > 0 ? Math.round(rm.totalMs / rm.count) + ' ms' : '-';
+          const err1h = rm.errors1h || 0;
+          const errCell =
+            err1h > 0
+              ? '<span class="status-err">' + err1h + '</span> <span class="meta-status">(' + rm.errors + ')</span>'
+              : rm.errors > 0
+                ? '<span class="status-ok">0</span> <span class="meta-status">(' + rm.errors + ')</span>'
+                : '0';
           tr.innerHTML =
             '<td>' + (ROUTE_NAMES[key] || key) + '</td>' +
             '<td class="num">' + rm.count.toLocaleString() + '</td>' +
             '<td class="num">' + fmtBytes(rm.bytesSent) + '</td>' +
             '<td class="num hide-sm">' + avg + '</td>' +
-            '<td class="num ' + (rm.errors > 0 ? 'status-err' : '') + '">' + rm.errors + '</td>';
+            '<td class="num">' + errCell + '</td>';
           routeBody.appendChild(tr);
         });
+
+        const trPills = document.getElementById('translationPills');
+        if (d.translations) {
+          trPills.innerHTML = Object.entries(TRANSLATION_LABELS)
+            .map(([k, label]) => {
+              const st = d.translations[k] || { count: 0, errors: 0, totalMs: 0 };
+              const avg = st.count > 0 ? Math.round(st.totalMs / st.count) + ' ms' : '-';
+              const errBadge = st.errors > 0 ? ' • <span class="status-err">' + st.errors + ' err</span>' : '';
+              return (
+                '<div class="rank-row"><span>' +
+                label +
+                '</span><strong>' +
+                st.count.toLocaleString() +
+                ' <span class="meta-status">(' +
+                avg +
+                errBadge +
+                ')</span></strong></div>'
+              );
+            })
+            .join('');
+        }
+
+        const provPills = document.getElementById('providerPills');
+        if (d.providers) {
+          provPills.innerHTML = Object.entries(PROVIDER_LABELS)
+            .map(([k, label]) => {
+              const st = d.providers[k] || { requests: 0, errors: 0, resultsReturned: 0, totalMs: 0 };
+              const avg = st.requests > 0 ? Math.round(st.totalMs / st.requests) + ' ms' : '-';
+              const errBadge = st.errors > 0 ? ' • <span class="status-err">' + st.errors + ' err</span>' : '';
+              return (
+                '<div class="rank-row"><span>' +
+                label +
+                '</span><strong>' +
+                st.requests.toLocaleString() +
+                ' <span class="meta-status">(' +
+                avg +
+                errBadge +
+                ')</span></strong></div>'
+              );
+            })
+            .join('');
+        }
 
         const langPills = document.getElementById('langPills');
         langPills.innerHTML = d.topLanguages.length
@@ -672,23 +820,8 @@ export function renderDashboardPage(): string {
           ? d.topMedia.map((x) => '<div class="rank-row"><a href="https://www.imdb.com/title/' + x.imdbId + '/" target="_blank" rel="noopener">' + x.imdbId + ' (' + x.type + ')</a><strong>' + x.count.toLocaleString() + '</strong></div>').join('')
           : '<span class="meta-status">No titles queried yet</span>';
 
-        const eventsBody = document.getElementById('eventsBody');
-        eventsBody.innerHTML = '';
-        d.recentEvents.forEach((ev) => {
-          const tr = document.createElement('tr');
-          const stClass = ev.status >= 500 ? 'status-err' : ev.status >= 400 ? 'status-warn' : 'status-ok';
-          const srcTag = ev.viaRender ? ' • <span class="status-warn">render</span>' : '';
-          const safePath = ev.path.replace(/</g, '&lt;').replace(/"/g, '&quot;');
-          tr.innerHTML =
-            '<td class="mono">' + ev.ts.slice(11, 19) + '</td>' +
-            '<td>' + ev.route + srcTag + '</td>' +
-            '<td class="mono path-cell" title="' + safePath + '">' + safePath + '</td>' +
-            '<td class="num ' + stClass + '">' + ev.status + '</td>' +
-            '<td class="num hide-sm">' + ev.durationMs + ' ms</td>' +
-            '<td class="num hide-sm">' + fmtBytes(ev.bytesSent) + '</td>' +
-            '<td class="mono">' + ev.country + ' • ' + ev.clientHash.slice(0, 8) + '</td>';
-          eventsBody.appendChild(tr);
-        });
+        lastSnapshot = d;
+        renderEventsTable(d);
       } catch (e) {
         if (ind) ind.textContent = 'Offline • retrying';
       }

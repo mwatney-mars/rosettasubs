@@ -1,5 +1,6 @@
 import { RawSubtitleResult, SubtitleQuery } from '../types';
 import { toIso639_1, toIso639_2, toSubdlCode } from '../languages';
+import { metrics } from '../metrics';
 import { scoreReleaseMatch } from './releaseScorer';
 
 interface SubdlSubtitleItem {
@@ -53,6 +54,7 @@ export async function searchSubdl(
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const t0 = Date.now();
 
   try {
     const res = await fetch(`${SUBDL_API_BASE}?${params.toString()}`, {
@@ -63,10 +65,17 @@ export async function searchSubdl(
       signal: controller.signal
     });
 
-    if (!res.ok) return [];
+    if (!res.ok) {
+      metrics.recordProviderCall('subdl', Date.now() - t0, 0, true);
+      return [];
+    }
 
     const json = (await res.json()) as SubdlResponse;
-    if (!json.status || !Array.isArray(json.subtitles)) return [];
+    if (!json.status || !Array.isArray(json.subtitles)) {
+      metrics.recordProviderCall('subdl', Date.now() - t0, 0, false);
+      return [];
+    }
+    metrics.recordProviderCall('subdl', Date.now() - t0, json.subtitles.length, false);
 
     const results: RawSubtitleResult[] = [];
     const langCounts = new Map<string, number>();
@@ -108,6 +117,7 @@ export async function searchSubdl(
 
     return results;
   } catch {
+    metrics.recordProviderCall('subdl', Date.now() - t0, 0, true);
     return [];
   } finally {
     clearTimeout(timer);
