@@ -312,7 +312,10 @@ export function createApp() {
     }
 
     const cacheKey = `tr:${payload.aiProvider}:${payload.aiModel ?? ''}:${payload.fromLang}:${payload.toLang}:${payload.src.u}:${payload.src.se ?? ''}:${payload.src.ep ?? ''}`;
-    const cached = subtitleContentCache.get(cacheKey);
+    const sharedKey = `tr:shared:${payload.fromLang}:${payload.toLang}:${payload.src.u}:${payload.src.se ?? ''}:${payload.src.ep ?? ''}`;
+    const cached =
+      subtitleContentCache.get(cacheKey) ||
+      (!payload.aiApiKey ? subtitleContentCache.get(sharedKey) : undefined);
     if (cached) {
       res.setHeader('Content-Type', 'application/x-subrip; charset=utf-8');
       res.setHeader('Cache-Control', 'public, max-age=86400');
@@ -336,6 +339,7 @@ export function createApp() {
 
         if (translatedSrt.trim()) {
           subtitleContentCache.set(cacheKey, translatedSrt);
+          subtitleContentCache.set(sharedKey, translatedSrt);
         }
         return translatedSrt;
       })();

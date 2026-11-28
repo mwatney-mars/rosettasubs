@@ -1,4 +1,7 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
 import request from 'supertest';
 import zlib from 'zlib';
 import iconv from 'iconv-lite';
@@ -11,7 +14,7 @@ import {
   encodeTranslateToken
 } from '../src/config';
 import { toIso639_1, toIso639_2, toSubdlCode, getLanguageName } from '../src/languages';
-import { TTLCache, searchCache, subtitleContentCache } from '../src/cache';
+import { PersistentSubtitleCache, TTLCache, searchCache, subtitleContentCache } from '../src/cache';
 import {
   assToSrt,
   decodeSubtitleBuffer,
@@ -101,6 +104,26 @@ describe('TTLCache', () => {
 
     await new Promise((r) => setTimeout(r, 70));
     expect(cache.get('a')).toBeUndefined();
+  });
+
+  it('persists compressed .srt.gz entries to disk and reloads them across instances', () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'rosetta-sub-cache-'));
+    try {
+      const cache1 = new PersistentSubtitleCache(60_000, 10, tmpDir, 60_000);
+      const srt = '1\n00:00:01,000 --> 00:00:03,000\nPersisted on disk\n';
+      cache1.set('sub:https://example.com/1.srt::', srt);
+      expect(cache1.stats().diskFiles).toBe(1);
+      expect(cache1.stats().diskBytes).toBeGreaterThan(0);
+
+      const cache2 = new PersistentSubtitleCache(60_000, 10, tmpDir, 60_000);
+      expect(cache2.stats().size).toBe(0);
+      expect(cache2.stats().diskFiles).toBe(1);
+      expect(cache2.get('sub:https://example.com/1.srt::')).toBe(srt);
+      expect(cache2.stats().hits).toBe(1);
+      expect(cache2.stats().size).toBe(1);
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
   });
 });
 

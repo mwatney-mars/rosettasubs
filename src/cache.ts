@@ -1,16 +1,30 @@
+import fs from 'fs';
+import path from 'path';
+import crypto from 'crypto';
+import zlib from 'zlib';
+
 interface CacheEntry<T> {
   value: T;
   expiresAt: number;
 }
 
+export interface CacheStats {
+  size: number;
+  hits: number;
+  misses: number;
+  maxEntries: number;
+  diskFiles?: number;
+  diskBytes?: number;
+}
+
 export class TTLCache<T> {
-  private store = new Map<string, CacheEntry<T>>();
-  private hits = 0;
-  private misses = 0;
+  protected store = new Map<string, CacheEntry<T>>();
+  protected hits = 0;
+  protected misses = 0;
 
   constructor(
-    private readonly defaultTtlMs: number = 15 * 60 * 1000,
-    private readonly maxEntries: number = 1000
+    protected readonly defaultTtlMs: number = 15 * 60 * 1000,
+    protected readonly maxEntries: number = 1000
   ) {}
 
   get(key: string): T | undefined {
@@ -55,7 +69,7 @@ export class TTLCache<T> {
     this.misses = 0;
   }
 
-  stats(): { size: number; hits: number; misses: number; maxEntries: number } {
+  stats(): CacheStats {
     return {
       size: this.store.size,
       hits: this.hits,
@@ -65,8 +79,175 @@ export class TTLCache<T> {
   }
 }
 
+export class PersistentSubtitleCache extends TTLCache<string> {
+  private readonly diskDir: string | null;
+  private readonly diskTtlMs: number;
+  private diskFiles = 0;
+  private diskBytes = 0;
+
+  constructor(
+    ramTtlMs: number = 24 * 60 * 60 * 1000,
+    ramMaxEntries: number = 2000,
+    diskDir?: string | null,
+    diskTtlMs: number = 30 * 24 * 60 * 60 * 1000
+  ) {
+    super(ramTtlMs, ramMaxEntries);
+    this.diskTtlMs = diskTtlMs;
+
+    const isRenderEdge = Boolean(process.env.REDIRECT_TO_URL || process.env.RENDER === 'true');
+    if (diskDir !== undefined) {
+      this.diskDir = diskDir;
+    } else if (process.env.NODE_ENV === 'test' || isRenderEdge) {
+      this.diskDir = null;
+    } else {
+      this.diskDir = process.env.SUBTITLE_CACHE_DIR || '/data/cache/subtitles';
+    }
+
+    if (this.diskDir) {
+      this.initDiskDirectory();
+    }
+  }
+
+  private initDiskDirectory(): void {
+    if (!this.diskDir) return;
+    try {
+      fs.mkdirSync(this.diskDir, { recursive: true });
+      let files = 0;
+      let bytes = 0;
+      const now = Date.now();
+      const shards = fs.readdirSync(this.diskDir, { withFileTypes: true });
+      for (const shard of shards) {
+        if (!shard.isDirectory()) continue;
+        const shardPath = path.join(this.diskDir, shard.name);
+        const entries = fs.readdirSync(shardPath, { withFileTypes: true });
+        for (const entry of entries) {
+          if (!entry.isFile() || !entry.name.endsWith('.srt.gz')) continue;
+          const fullPath = path.join(shardPath, entry.name);
+          try {
+            const st = fs.statSync(fullPath);
+            if (now - st.mtimeMs > this.diskTtlMs) {
+              fs.unlinkSync(fullPath);
+            } else {
+              files++;
+              bytes += st.size;
+            }
+          } catch {
+            // ignore race condition
+          }
+        }
+      }
+      this.diskFiles = files;
+      this.diskBytes = bytes;
+    } catch {
+      // ignore disk init errors if volume is read-only
+    }
+  }
+
+  private getFilePath(key: string): { dir: string; file: string } | null {
+    if (!this.diskDir) return null;
+    const hash = crypto.createHash('sha256').update(key).digest('hex');
+    const shard = hash.slice(0, 2);
+    const dir = path.join(this.diskDir, shard);
+    return { dir, file: path.join(dir, `${hash}.srt.gz`) };
+  }
+
+  override get(key: string): string | undefined {
+    const entry = this.store.get(key);
+    if (entry) {
+      if (Date.now() <= entry.expiresAt) {
+        this.store.delete(key);
+        this.store.set(key, entry);
+        this.hits++;
+        return entry.value;
+      }
+      this.store.delete(key);
+    }
+
+    const loc = this.getFilePath(key);
+    if (loc) {
+      try {
+        if (fs.existsSync(loc.file)) {
+          const st = fs.statSync(loc.file);
+          if (Date.now() - st.mtimeMs <= this.diskTtlMs) {
+            const compressed = fs.readFileSync(loc.file);
+            const value = zlib.gunzipSync(compressed).toString('utf8');
+            super.set(key, value, this.defaultTtlMs);
+            this.hits++;
+            return value;
+          }
+          fs.unlinkSync(loc.file);
+          this.diskFiles = Math.max(0, this.diskFiles - 1);
+          this.diskBytes = Math.max(0, this.diskBytes - st.size);
+        }
+      } catch {
+        // fall through to miss
+      }
+    }
+
+    this.misses++;
+    return undefined;
+  }
+
+  override set(key: string, value: string, ttlMs: number = this.defaultTtlMs): void {
+    super.set(key, value, ttlMs);
+
+    const loc = this.getFilePath(key);
+    if (!loc || !value) return;
+
+    try {
+      fs.mkdirSync(loc.dir, { recursive: true });
+      let prevSize = 0;
+      const existed = fs.existsSync(loc.file);
+      if (existed) {
+        try {
+          prevSize = fs.statSync(loc.file).size;
+        } catch {
+          prevSize = 0;
+        }
+      }
+      const gz = zlib.gzipSync(Buffer.from(value, 'utf8'), { level: 1 });
+      const tmpFile = `${loc.file}.${process.pid}.tmp`;
+      fs.writeFileSync(tmpFile, gz);
+      fs.renameSync(tmpFile, loc.file);
+      if (!existed) {
+        this.diskFiles++;
+      }
+      this.diskBytes = Math.max(0, this.diskBytes - prevSize + gz.length);
+    } catch {
+      // ignore disk write error
+    }
+  }
+
+  override clear(): void {
+    super.clear();
+    if (!this.diskDir) return;
+    try {
+      fs.rmSync(this.diskDir, { recursive: true, force: true });
+      fs.mkdirSync(this.diskDir, { recursive: true });
+      this.diskFiles = 0;
+      this.diskBytes = 0;
+    } catch {
+      // ignore
+    }
+  }
+
+  override stats(): CacheStats {
+    return {
+      size: this.store.size,
+      hits: this.hits,
+      misses: this.misses,
+      maxEntries: this.maxEntries,
+      diskFiles: this.diskFiles,
+      diskBytes: this.diskBytes
+    };
+  }
+}
+
 const defaultTtl = Number(process.env.CACHE_TTL_MS) || 6 * 60 * 60 * 1000;
 const searchCacheMax = Number(process.env.SEARCH_CACHE_MAX) || 10000;
 const subtitleCacheMax = Number(process.env.SUBTITLE_CACHE_MAX) || 2000;
 export const searchCache = new TTLCache<unknown>(defaultTtl, searchCacheMax);
-export const subtitleContentCache = new TTLCache<string>(24 * 60 * 60 * 1000, subtitleCacheMax);
+export const subtitleContentCache = new PersistentSubtitleCache(
+  24 * 60 * 60 * 1000,
+  subtitleCacheMax
+);

@@ -579,7 +579,11 @@ export function renderDashboardPage(): string {
 
         document.getElementById('kpiCacheHit').textContent = d.cache.hitRatePercent + '%';
         document.getElementById('kpiSearchCache').textContent = d.cache.search.size + '/' + d.cache.search.maxEntries;
-        document.getElementById('kpiSubCache').textContent = d.cache.subtitles.size + '/' + d.cache.subtitles.maxEntries;
+        const diskInfo = d.cache.subtitles.diskFiles
+          ? ' (Disk ' + d.cache.subtitles.diskFiles + ' • ' + fmtBytes(d.cache.subtitles.diskBytes || 0) + ')'
+          : '';
+        document.getElementById('kpiSubCache').textContent =
+          d.cache.subtitles.size + '/' + d.cache.subtitles.maxEntries + diskInfo;
         document.getElementById('kpiRam').textContent = Math.round(d.system.rssBytes / (1024 * 1024)) + ' MB';
 
         if (d.render) {
