@@ -805,7 +805,7 @@ export function renderConfigurePage(config: AddonConfig, baseUrl: string): strin
         <span class="brand-name">RosettaSubs</span>
       </div>
       <div class="topbar-meta">
-        <span>org.stremio.rosettasubs • v1.1.2</span>
+        <span>org.stremio.rosettasubs • v1.1.3</span>
         <a class="topbar-link" href="${supportUrl}" target="_blank" rel="noopener noreferrer">Sponsor</a>
       </div>
     </nav>

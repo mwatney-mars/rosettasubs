@@ -39,7 +39,7 @@ export function buildManifest(
 
   return {
     id: 'org.stremio.rosettasubs',
-    version: '1.1.2',
+    version: '1.1.3',
     name: 'RosettaSubs',
     description,
     logo: `${cleanBase}/logo.svg`,
