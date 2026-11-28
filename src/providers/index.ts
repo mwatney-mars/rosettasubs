@@ -323,7 +323,7 @@ export async function getStremioSubtitles(
           lang: descriptiveLang ? label : lang,
           label
         });
-      } else if (config.aiMode !== 'off' && hasAiKey) {
+      } else if (config.aiMode !== 'off') {
         if (primaryCandidates.length > 0 && secondaryCandidates.length === 0) {
           const bestPrimary = primaryCandidates[0];
           const dualToken = encodeDualToken({
@@ -335,7 +335,7 @@ export async function getStremioSubtitles(
             ),
             primaryLang: lang,
             secondaryLang: nativeLang,
-            annotate: Boolean(config.dualSubtitlesAnnotate),
+            annotate: Boolean(config.dualSubtitlesAnnotate && hasAiKey),
             aiProvider: config.aiProvider,
             aiApiKey: config.aiApiKey,
             aiModel: config.aiModel,
@@ -359,7 +359,7 @@ export async function getStremioSubtitles(
             ),
             primaryLang: lang,
             secondaryLang: nativeLang,
-            annotate: Boolean(config.dualSubtitlesAnnotate),
+            annotate: Boolean(config.dualSubtitlesAnnotate && hasAiKey),
             aiProvider: config.aiProvider,
             aiApiKey: config.aiApiKey,
             aiModel: config.aiModel,
@@ -421,8 +421,8 @@ export async function getStremioSubtitles(
     }
   }
 
-  // AI Fallback / Multimodal Translation tracks
-  if (config.aiMode !== 'off' && hasAiKey) {
+  // AI Fallback / Multimodal Translation tracks (works out-of-the-box via keyless translation, or upgraded with user's AI API key)
+  if (config.aiMode !== 'off') {
     const langsNeedingAi = config.languages.filter((targetLang) => {
       const existingCount = (byLang.get(targetLang) || []).length;
       return config.aiMode === 'always' || (config.aiMode === 'fallback' && existingCount === 0);

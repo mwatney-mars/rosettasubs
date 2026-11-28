@@ -477,6 +477,55 @@ describe('Express Stremio Add-on Routes & Multimodal AI Flow', () => {
     expect(gtxCalls).toBe(1);
   });
 
+  it('emits and translates fallback tracks via translateBatchViaGoogleFree even when the user does not provide an AI API key', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes('sub.wyzie.ru')) {
+        return new Response(
+          JSON.stringify([
+            {
+              id: 'w-en-only',
+              url: 'https://example.com/keyless-source.srt',
+              language: 'en',
+              format: 'srt',
+              encoding: 'UTF-8'
+            }
+          ]),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+      if (url === 'https://example.com/keyless-source.srt') {
+        return new Response('1\n00:00:01,000 --> 00:00:03,000\nGood morning\n', {
+          status: 200
+        });
+      }
+      if (url.includes('clients5.google.com/translate_a/t')) {
+        return new Response(JSON.stringify(['Bom dia']), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+      return new Response('', { status: 404 });
+    });
+
+    const cfg = encodeConfig({
+      languages: ['pob'],
+      providers: ['wyzie'],
+      aiMode: 'fallback'
+      // No aiApiKey provided!
+    });
+
+    const listRes = await request(app).get(`/${cfg}/subtitles/movie/tt0133093.json`);
+    expect(listRes.status).toBe(200);
+    expect(listRes.body.subtitles).toHaveLength(1);
+    expect(listRes.body.subtitles[0].url).toContain('/translate/');
+
+    const trPath = listRes.body.subtitles[0].url.replace(/^https?:\/\/[^/]+/, '');
+    const trRes = await request(app).get(trPath);
+    expect(trRes.status).toBe(200);
+    expect(trRes.text).toContain('Bom dia');
+  });
+
   it('transcribes media via POST /api/multimodal/transcribe', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
       new Response(

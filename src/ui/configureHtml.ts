@@ -925,7 +925,7 @@ export function renderConfigurePage(config: AddonConfig, baseUrl: string): strin
           <div class="card-header">
             <div>
               <h2 class="step-title"><span class="step-num">03</span> AI translation fallback</h2>
-              <p class="hint">Translates the best available subtitle track on the fly when your language is missing</p>
+              <p class="hint">Works out of the box when your language is missing — add an optional API key for higher-quality LLM translation</p>
             </div>
           </div>
 
@@ -940,7 +940,7 @@ export function renderConfigurePage(config: AddonConfig, baseUrl: string): strin
             </label>
 
             <label class="field">
-              <span>AI provider</span>
+              <span>AI provider (optional upgrade)</span>
               <select id="aiProvider">
                 <option value="gemini">Google Gemini</option>
                 <option value="openai">OpenAI compatible</option>
@@ -951,11 +951,11 @@ export function renderConfigurePage(config: AddonConfig, baseUrl: string): strin
           <div id="aiDetails" class="field-grid ai-details">
             <label class="field">
               <div class="field-label-row">
-                <span>Provider API key</span>
+                <span>Provider API key (optional)</span>
                 <a id="aiKeyHelpLink" class="ext-link" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer">Get Gemini key &nearr;</a>
               </div>
               <div class="input-with-toggle">
-                <input type="password" id="aiApiKey" placeholder="API key" autocomplete="off" />
+                <input type="password" id="aiApiKey" placeholder="Optional — leave blank for built-in translation" autocomplete="off" />
                 <button type="button" class="eye-btn" data-target="aiApiKey">Show</button>
               </div>
             </label>
@@ -1287,7 +1287,13 @@ export function renderConfigurePage(config: AddonConfig, baseUrl: string): strin
         : 'Standard SRT';
 
       const langNames = cfg.languages.map((c) => (langByCode.get(c) ? langByCode.get(c).name : c)).join(', ');
-      const aiSummary = cfg.aiMode === 'off' ? 'Off' : (cfg.aiProvider === 'openai' ? 'OpenAI' : 'Gemini') + ' (' + cfg.aiMode + ')';
+      const aiSummary =
+        cfg.aiMode === 'off'
+          ? 'Off'
+          : (cfg.aiApiKey ? (cfg.aiProvider === 'openai' ? 'OpenAI' : 'Gemini') : 'Built-in') +
+            ' (' +
+            cfg.aiMode +
+            ')';
       const dualSummary = cfg.dualSubtitles
         ? '<div class="summary-item"><span>Dual reference</span><strong>' + (langByCode.get(cfg.dualSubtitlesNativeLang) ? langByCode.get(cfg.dualSubtitlesNativeLang).name : cfg.dualSubtitlesNativeLang) + '</strong></div>'
         : '';

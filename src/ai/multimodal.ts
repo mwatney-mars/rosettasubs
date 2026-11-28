@@ -336,7 +336,7 @@ async function translateBatch(
       : process.env.GEMINI_API_KEY);
 
   if (!apiKey) {
-    throw new Error(`Missing API key for AI provider: ${options.aiProvider}`);
+    return translateBatchViaGoogleFree(batch, options.fromLang, options.toLang);
   }
 
   const effectiveProvider = resolveEffectiveProvider(
@@ -463,7 +463,7 @@ async function annotateBatch(
       : process.env.GEMINI_API_KEY);
 
   if (!apiKey) {
-    throw new Error(`Missing API key for AI provider: ${options.aiProvider}`);
+    return new Map();
   }
 
   const effectiveProvider = resolveEffectiveProvider(
