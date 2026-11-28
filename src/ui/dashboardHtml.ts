@@ -276,9 +276,15 @@ export function renderDashboardPage(): string {
     /* Bottom Grid: Ranked Lists + Live Stream */
     .bottom-grid {
       display: grid;
-      grid-template-columns: minmax(280px, 1fr) minmax(0, 2.15fr);
+      grid-template-columns: minmax(280px, 1fr) minmax(0, 2.35fr);
       gap: 16px;
-      align-items: start;
+      align-items: stretch;
+    }
+
+    .card-events {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
     }
 
     .side-stack {
@@ -319,8 +325,11 @@ export function renderDashboardPage(): string {
       white-space: nowrap;
     }
 
+    th.path-col,
     td.path-cell {
-      max-width: clamp(140px, 28vw, 420px);
+      width: 100%;
+      max-width: 0;
+      min-width: 180px;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
@@ -394,7 +403,8 @@ export function renderDashboardPage(): string {
     }
 
     .table-scroll {
-      max-height: 440px;
+      flex: 1 1 auto;
+      max-height: 1120px;
       overflow-y: auto;
     }
   </style>
@@ -497,7 +507,7 @@ export function renderDashboardPage(): string {
         </div>
       </div>
 
-      <div class="card">
+      <div class="card card-events">
         <h2>Recent requests</h2>
         <div class="table-scroll table-wrap">
           <table>
@@ -505,7 +515,7 @@ export function renderDashboardPage(): string {
               <tr>
                 <th>Time</th>
                 <th>Route</th>
-                <th>Path</th>
+                <th class="path-col">Path</th>
                 <th class="num">Status</th>
                 <th class="num hide-sm">Latency</th>
                 <th class="num hide-sm">Size</th>

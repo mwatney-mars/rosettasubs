@@ -361,7 +361,7 @@ class MetricsCollector {
     }
 
     const shortPath =
-      req.originalUrl.length > 110 ? `${req.originalUrl.slice(0, 110)}...` : req.originalUrl;
+      req.originalUrl.length > 180 ? `${req.originalUrl.slice(0, 180)}...` : req.originalUrl;
     this.recentEvents.unshift({
       ts: new Date(now).toISOString(),
       method: req.method,
